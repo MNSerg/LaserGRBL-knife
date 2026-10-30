@@ -164,6 +164,9 @@ M5";
 			cfg.TravelSpeed = 0;
 			cfg.OptimizeOrder = true;
 			cfg.InsideFirst = true;
+			cfg.StartMarginMm = 0;
+			cfg.LaserOffsetX = 0;
+			cfg.LaserOffsetY = 0;
 
 			PlotPath square = new PlotPath();
 			square.Closed = true;
@@ -192,6 +195,9 @@ M5";
 			cfg.CornerThresholdDeg = 180;
 			cfg.OptimizeOrder = true;
 			cfg.InsideFirst = true;
+			cfg.StartMarginMm = 0;
+			cfg.LaserOffsetX = 0;
+			cfg.LaserOffsetY = 0;
 
 			PlotPath outer = Rect(20, 20, 80, 80);
 			PlotPath inner = Rect(40, 40, 60, 60);
@@ -199,6 +205,39 @@ M5";
 			PlotPoint first = FirstMove(gcode);
 			Assert.False(PlotGeom.SegmentThroughInterior(new PlotPoint(0, 0), first, outer.Points));
 			Assert.True(PlotGeom.Dist(first, new PlotPoint(20, 20)) < 0.05, first.X + "," + first.Y);
+		}
+
+		[Fact]
+		public void Blade_parks_outside_the_corner_marked_by_the_laser()
+		{
+			PlotterConfig cfg = PlotterConfig.CreateDefault();
+			cfg.SimplifyMm = 0;
+			cfg.MinSegmentMm = 0;
+			cfg.BladeOffsetMm = 0;
+			cfg.LeadInMm = 0;
+			cfg.OvercutMm = 0;
+			cfg.CornerThresholdDeg = 180;
+			cfg.StartMarginMm = 20;
+			cfg.LaserOffsetX = 10;
+			cfg.LaserOffsetY = 0;
+
+			PlotPath square = Rect(5, 8, 40, 50);
+			string gcode = PlotterPipeline.ConvertPaths(new[] { square }, cfg);
+			List<PlotPoint> motion = MotionPoints(gcode);
+
+			Assert.True(motion.Count >= 2);
+			Assert.True(Math.Abs(motion[0].X - (-10)) < 0.05, motion[0].X + "," + motion[0].Y);
+			Assert.True(Math.Abs(motion[0].Y - (-20)) < 0.05, motion[0].X + "," + motion[0].Y);
+			Assert.True(Math.Abs(motion[1].X - 10) < 0.05, motion[1].X + "," + motion[1].Y);
+			Assert.True(Math.Abs(motion[1].Y) < 0.05, motion[1].X + "," + motion[1].Y);
+			Assert.DoesNotContain("G0", gcode);
+
+			List<PlotPoint> onSheet = new List<PlotPoint>();
+			onSheet.Add(new PlotPoint(10, 0));
+			onSheet.Add(new PlotPoint(45, 0));
+			onSheet.Add(new PlotPoint(45, 42));
+			onSheet.Add(new PlotPoint(10, 42));
+			Assert.False(PlotGeom.SegmentThroughInterior(motion[0], motion[1], onSheet));
 		}
 
 		[Fact]
@@ -281,14 +320,22 @@ M5";
 
 		private static PlotPoint FirstMove(string gcode)
 		{
+			return MotionPoints(gcode)[0];
+		}
+
+		private static List<PlotPoint> MotionPoints(string gcode)
+		{
+			List<PlotPoint> points = new List<PlotPoint>();
 			string[] lines = gcode.Split('\n');
 			for (int i = 0; i < lines.Length; i++)
 			{
 				string line = lines[i].Trim();
 				if (line.StartsWith("G0") || line.StartsWith("G1") || line.StartsWith("G2") || line.StartsWith("G3"))
-					return new PlotPoint(Word(line, 'X'), Word(line, 'Y'));
+					points.Add(new PlotPoint(Word(line, 'X'), Word(line, 'Y')));
 			}
-			throw new InvalidOperationException("no motion");
+			if (points.Count == 0)
+				throw new InvalidOperationException("no motion");
+			return points;
 		}
 
 		private static double Word(string line, char axis)
@@ -313,6 +360,9 @@ M5";
 			cfg.OptimizeOrder = false;
 			cfg.InsideFirst = false;
 			cfg.Passes = 1;
+			cfg.StartMarginMm = 0;
+			cfg.LaserOffsetX = 0;
+			cfg.LaserOffsetY = 0;
 			cfg.LeadInMm = 0;
 			cfg.OvercutMm = 0;
 			cfg.LiftAngleDeg = 0;

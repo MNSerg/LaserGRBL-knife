@@ -56,6 +56,11 @@ namespace LaserGRBL.Plotter
 		public int Passes;
 		public bool LinearizeArcs;
 		public double ArcStepDeg;
+		/// <summary>How far outside the drawing's bottom-left corner the blade waits before the first contour.</summary>
+		public double StartMarginMm;
+		/// <summary>Positioning laser minus blade axis. Positive X means the laser is to the right of the blade.</summary>
+		public double LaserOffsetX;
+		public double LaserOffsetY;
 
 		public static PlotterConfig CreateDefault()
 		{
@@ -85,6 +90,9 @@ namespace LaserGRBL.Plotter
 			c.Passes = 1;
 			c.LinearizeArcs = false;
 			c.ArcStepDeg = 10;
+			c.StartMarginMm = 20;
+			c.LaserOffsetX = 10;
+			c.LaserOffsetY = 0;
 			return c;
 		}
 
@@ -162,6 +170,12 @@ namespace LaserGRBL.Plotter
 			if (Passes > 30) Passes = 30;
 			if (ArcStepDeg < 1) ArcStepDeg = 1;
 			if (ArcStepDeg > 45) ArcStepDeg = 45;
+			if (StartMarginMm < 0) StartMarginMm = 0;
+			if (StartMarginMm > 500) StartMarginMm = 500;
+			if (LaserOffsetX < -500) LaserOffsetX = -500;
+			if (LaserOffsetX > 500) LaserOffsetX = 500;
+			if (LaserOffsetY < -500) LaserOffsetY = -500;
+			if (LaserOffsetY > 500) LaserOffsetY = 500;
 			if (string.IsNullOrEmpty(BladeName)) BladeName = "Blade";
 		}
 	}

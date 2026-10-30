@@ -17,12 +17,19 @@ namespace LaserGRBL.Plotter
 	{
 		public static List<PlotMove> Build(IList<PlotPath> paths, PlotterConfig cfg)
 		{
+			return Build(paths, cfg, new PlotPoint(0, 0), false);
+		}
+
+		public static List<PlotMove> Build(IList<PlotPath> paths, PlotterConfig cfg, PlotPoint park, bool parkFirst)
+		{
 			List<PlotMove> moves = new List<PlotMove>();
 			if (paths == null || cfg == null)
 				return moves;
 
 			int passes = cfg.Passes;
 			PlotPoint cursor = new PlotPoint(0, 0);
+			if (parkFirst)
+				Approach(moves, cfg, paths, ref cursor, park);
 			foreach (PlotPath path in paths)
 			{
 				if (path == null || path.Points == null || path.Points.Count < 2)
@@ -31,6 +38,38 @@ namespace LaserGRBL.Plotter
 					Emit(path, cfg, moves, paths, ref cursor);
 			}
 			return moves;
+		}
+
+		private static void Approach(List<PlotMove> moves, PlotterConfig cfg, IList<PlotPath> obstacles, ref PlotPoint cursor, PlotPoint park)
+		{
+			if (PlotGeom.Dist(cursor, park) <= 0.0001)
+			{
+				cursor = park;
+				return;
+			}
+			if (cfg.PenMode == PlotterPenMode.Manual)
+			{
+				double margin = cfg.LeadInMm;
+				if (cfg.BladeOffsetMm > margin)
+					margin = cfg.BladeOffsetMm;
+				if (cfg.StartMarginMm > margin)
+					margin = cfg.StartMarginMm;
+				if (margin < 1)
+					margin = 1;
+				List<PlotPoint> route = SafeRoute.Route(cursor, park, obstacles, margin);
+				for (int r = 0; r < route.Count; r++)
+				{
+					if (PlotGeom.Dist(cursor, route[r]) <= 0.0001)
+						continue;
+					Travel(moves, route[r]);
+					cursor = route[r];
+				}
+			}
+			else
+			{
+				Travel(moves, park);
+			}
+			cursor = park;
 		}
 
 		private static void Emit(PlotPath path, PlotterConfig cfg, List<PlotMove> moves, IList<PlotPath> obstacles, ref PlotPoint cursor)

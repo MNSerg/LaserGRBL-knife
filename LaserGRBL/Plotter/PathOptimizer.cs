@@ -16,6 +16,11 @@ namespace LaserGRBL.Plotter
 
 		public static List<PlotPath> Prepare(IList<PlotPath> source, PlotterConfig cfg)
 		{
+			return Prepare(source, cfg, new PlotPoint(0, 0));
+		}
+
+		public static List<PlotPath> Prepare(IList<PlotPath> source, PlotterConfig cfg, PlotPoint start)
+		{
 			List<PlotPath> clean = new List<PlotPath>();
 			if (source == null)
 				return clean;
@@ -28,7 +33,7 @@ namespace LaserGRBL.Plotter
 			}
 
 			if (cfg.PenMode == PlotterPenMode.Manual)
-				return OrderKnifeDown(clean, cfg);
+				return OrderKnifeDown(clean, cfg, start);
 
 			if (clean.Count <= 1 || (!cfg.OptimizeOrder && !cfg.InsideFirst))
 				return clean;
@@ -45,7 +50,7 @@ namespace LaserGRBL.Plotter
 			}
 
 			List<PlotPath> ordered = new List<PlotPath>();
-			PlotPoint cursor = new PlotPoint(0, 0);
+			PlotPoint cursor = start;
 			double heading = 0;
 			bool haveHeading = false;
 			for (int d = maxDepth; d >= 0; d--)
@@ -77,7 +82,7 @@ namespace LaserGRBL.Plotter
 		/// across a contour to reach it. A hole that cannot be reached from
 		/// outside waits until every reachable outline has been cut.
 		/// </summary>
-		private static List<PlotPath> OrderKnifeDown(List<PlotPath> clean, PlotterConfig cfg)
+		private static List<PlotPath> OrderKnifeDown(List<PlotPath> clean, PlotterConfig cfg, PlotPoint start)
 		{
 			List<PlotPath> ordered = new List<PlotPath>();
 			if (clean.Count == 0)
@@ -91,7 +96,7 @@ namespace LaserGRBL.Plotter
 			for (int i = 0; i < clean.Count; i++)
 				left.Add(i);
 
-			PlotPoint cursor = new PlotPoint(0, 0);
+			PlotPoint cursor = start;
 			double heading = 0;
 			bool haveHeading = false;
 			bool reorder = cfg.OptimizeOrder && clean.Count > 1;

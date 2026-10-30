@@ -34,6 +34,9 @@ namespace LaserGRBL.Plotter
 		private readonly CheckBox mOrder;
 		private readonly CheckBox mInside;
 		private readonly CheckBox mLinearize;
+		private readonly NumericUpDown mMargin;
+		private readonly NumericUpDown mLaserX;
+		private readonly NumericUpDown mLaserY;
 		private bool mLoading;
 
 		public static bool Edit(IWin32Window owner)
@@ -58,7 +61,7 @@ namespace LaserGRBL.Plotter
 			MinimizeBox = false;
 			ShowInTaskbar = false;
 			AutoScaleMode = AutoScaleMode.Font;
-			ClientSize = new Size(680, 740);
+			ClientSize = new Size(720, 900);
 			Font = SystemFonts.MessageBoxFont;
 			try
 			{
@@ -102,6 +105,9 @@ namespace LaserGRBL.Plotter
 			mMinSeg = AddNum(table, Tr("Minimum segment, mm", "Мин. отрезок, мм"), 0, 5, 2, 0.01m);
 			mPasses = AddNum(table, Tr("Passes", "Проходы"), 1, 30, 0, 1);
 
+			mMargin = AddNum(table, Tr("Start margin outside the drawing, mm", "Отступ снаружи габарита, мм"), 0, 500, 1, 1);
+			mLaserX = AddNum(table, Tr("Positioning laser offset X, mm", "Смещение позиционного лазера X, мм"), -500, 500, 1, 1);
+			mLaserY = AddNum(table, Tr("Positioning laser offset Y, mm", "Смещение позиционного лазера Y, мм"), -500, 500, 1, 1);
 			mCutSpeed = AddNum(table, Tr("Cut speed, mm/min", "Скорость реза, мм/мин"), 1, 50000, 0, 50);
 			mTravel = AddNum(table, Tr("Travel speed, mm/min (0 = cut speed, no G0 while the knife stays down)", "Переезд, мм/мин (0 = скорость реза; нож не поднимается)"), 0, 50000, 0, 50);
 			mPlunge = AddNum(table, Tr("Plunge speed, mm/min", "Скорость опускания, мм/мин"), 1, 50000, 0, 50);
@@ -125,14 +131,14 @@ namespace LaserGRBL.Plotter
 
 			Label help = new Label();
 			help.AutoSize = false;
-			help.Height = 124;
+			help.Height = 156;
 			help.Dock = DockStyle.Top;
 			help.Text = Tr(
-				"This machine has no Z. Set the blade height by hand before the job (usually on the table, to cut 1 mm rubber through). Every XY move is G1 at cut speed: the knife never rapids. The job starts at X0 Y0, so put that zero in the scrap outside the drawing. The knife walks around a shape and enters at the nearest point; it does not cut across the middle to reach the start. A turn smaller than the sharp-corner angle follows the curve. A sharper corner swings the holder around the tip on an arc of the blade offset, so the corner stays sharp. One pass, no hatch.",
-				"Оси Z нет. Высоту ножа выставьте вручную до пуска (обычно в стол, чтобы прорезать резину 1 мм). Любое движение X Y — это G1 на скорости реза, быстрых G0 нет. Программа считает, что нож стоит в X0 Y0: поставьте этот ноль в отход, снаружи рисунка. К фигуре нож подходит снаружи, в ближайшую точку, и не режет её посредине по пути к старту. Поворот меньше порога острого угла идёт по кривой. Более острый угол — дуга держателя вокруг острия радиусом смещения, поэтому угол остаётся острым. Один проход, без штриховки.");
+				"Aim the positioning laser at the bottom-left corner of the sheet and zero XY. The laser sits to the right of the blade (default 10 mm, Y unchanged). The job moves the blade 20 mm outside that corner, to the left and toward you, then travels into the first contour. Every XY move is G1. A gentle turn follows the curve; a sharp corner swings the holder around the tip.",
+				"Наведите позиционный лазер на левый нижний угол листа и обнулите XY. Лазер правее лезвия (по умолчанию 10 мм, по Y без смещения). Программа сначала уводит лезвие на 20 мм за этот угол — влево и на себя — и только потом едет к первому контуру и врезается в лист. Любое движение X Y — это G1. Плавный поворот идёт по кривой, острый — дугой держателя вокруг острия.");
 			table.Controls.Add(help, 0, table.RowCount);
 			table.SetColumnSpan(help, 2);
-			table.RowStyles.Add(new RowStyle(SizeType.Absolute, 132));
+			table.RowStyles.Add(new RowStyle(SizeType.Absolute, 164));
 
 			FlowLayoutPanel buttons = new FlowLayoutPanel();
 			buttons.FlowDirection = FlowDirection.RightToLeft;
@@ -180,6 +186,9 @@ namespace LaserGRBL.Plotter
 			Set(mSimplify, (decimal)cfg.SimplifyMm);
 			Set(mMinSeg, (decimal)cfg.MinSegmentMm);
 			Set(mPasses, cfg.Passes);
+			Set(mMargin, (decimal)cfg.StartMarginMm);
+			Set(mLaserX, (decimal)cfg.LaserOffsetX);
+			Set(mLaserY, (decimal)cfg.LaserOffsetY);
 			Set(mCutSpeed, cfg.CutSpeed);
 			Set(mTravel, cfg.TravelSpeed);
 			Set(mPlunge, cfg.PlungeSpeed);
@@ -230,6 +239,9 @@ namespace LaserGRBL.Plotter
 			cfg.SimplifyMm = (double)mSimplify.Value;
 			cfg.MinSegmentMm = (double)mMinSeg.Value;
 			cfg.Passes = (int)mPasses.Value;
+			cfg.StartMarginMm = (double)mMargin.Value;
+			cfg.LaserOffsetX = (double)mLaserX.Value;
+			cfg.LaserOffsetY = (double)mLaserY.Value;
 			cfg.CutSpeed = (int)mCutSpeed.Value;
 			cfg.TravelSpeed = (int)mTravel.Value;
 			cfg.PlungeSpeed = (int)mPlunge.Value;

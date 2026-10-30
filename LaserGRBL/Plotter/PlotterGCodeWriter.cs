@@ -30,6 +30,13 @@ namespace LaserGRBL.Plotter
 				sb.Append("(manual knife height, blade stays down)\r\n");
 				sb.Append("(every XY move is a cut; the approach does not cross a contour)\r\n");
 			}
+			if (cfg.StartMarginMm > 0 || System.Math.Abs(cfg.LaserOffsetX) > 0.0001 || System.Math.Abs(cfg.LaserOffsetY) > 0.0001)
+			{
+				sb.Append("(zero XY with the positioning laser on the sheet bottom-left)\r\n");
+				sb.Append("(blade parks X").Append(PlotGeom.Num(cfg.LaserOffsetX - cfg.StartMarginMm));
+				sb.Append(" Y").Append(PlotGeom.Num(cfg.LaserOffsetY - cfg.StartMarginMm));
+				sb.Append(" then cuts into the drawing)\r\n");
+			}
 			sb.Append("G90\r\n");
 
 			bool manual = cfg.PenMode == PlotterPenMode.Manual;

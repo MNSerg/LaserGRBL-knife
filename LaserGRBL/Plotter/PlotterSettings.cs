@@ -51,6 +51,9 @@ namespace LaserGRBL.Plotter
 			cfg.Passes = LaserGRBL.Settings.GetObject("Plotter.Passes", def.Passes);
 			cfg.LinearizeArcs = LaserGRBL.Settings.GetObject("Plotter.LinearizeArcs", def.LinearizeArcs);
 			cfg.ArcStepDeg = LaserGRBL.Settings.GetObject("Plotter.ArcStepDeg", def.ArcStepDeg);
+			cfg.StartMarginMm = LaserGRBL.Settings.GetObject("Plotter.StartMarginMm", def.StartMarginMm);
+			cfg.LaserOffsetX = LaserGRBL.Settings.GetObject("Plotter.LaserOffsetX", def.LaserOffsetX);
+			cfg.LaserOffsetY = LaserGRBL.Settings.GetObject("Plotter.LaserOffsetY", def.LaserOffsetY);
 			cfg.Normalize();
 			return cfg;
 		}
@@ -85,6 +88,9 @@ namespace LaserGRBL.Plotter
 			LaserGRBL.Settings.SetObject("Plotter.Passes", cfg.Passes);
 			LaserGRBL.Settings.SetObject("Plotter.LinearizeArcs", cfg.LinearizeArcs);
 			LaserGRBL.Settings.SetObject("Plotter.ArcStepDeg", cfg.ArcStepDeg);
+			LaserGRBL.Settings.SetObject("Plotter.StartMarginMm", cfg.StartMarginMm);
+			LaserGRBL.Settings.SetObject("Plotter.LaserOffsetX", cfg.LaserOffsetX);
+			LaserGRBL.Settings.SetObject("Plotter.LaserOffsetY", cfg.LaserOffsetY);
 		}
 
 		public static void RememberCutSpeed(int speed)
