@@ -28,6 +28,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Forms;
+using LaserGRBL.Plotter;
 
 namespace LaserGRBL.SvgConverter
 {
@@ -59,13 +60,44 @@ namespace LaserGRBL.SvgConverter
 		private static int rapidnum = 0;
 		private static bool SupportPWM = true;
 
+		// Plotter / knife actuation (active when PlotterSettings.Enabled)
+		private static bool plotterMode = false;
+		private static PlotterSettings.KnifeActuation knifeActuation = PlotterSettings.KnifeActuation.SpindleToggle;
+		private static float gcodeZDown = -1f;
+		private static float gcodeZUp = 5f;
+		private static float gcodeZFeed = 500f;
+		private static string knifeCustomDown = "M3";
+		private static string knifeCustomUp = "M5";
+		private static bool pauseOnKnifeDown = false;
+
 		public static void setup(GrblCore core)
 		{
 			SupportPWM = Settings.GetObject("Support Hardware PWM", true); //If Support PWM use S command instead of M3-M4 / M5
 
 			setDecimalPlaces(mDecimalPlaces);
 
-			gcodeXYFeed = Settings.GetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", 1000);
+			plotterMode = PlotterSettings.Enabled;
+			if (plotterMode)
+			{
+				gcodeXYFeed = PlotterSettings.CutSpeed;
+				gcodeDragCompensation = PlotterSettings.UseDragCompensation;
+				gcodeDragRadius = PlotterSettings.BladeOffsetMm;
+				gcodeDragAngle = PlotterSettings.SwivelAngleDeg;
+				knifeActuation = PlotterSettings.DownMode;
+				gcodeZDown = PlotterSettings.ZDown;
+				gcodeZUp = PlotterSettings.ZUp;
+				gcodeZFeed = PlotterSettings.ZFeed;
+				knifeCustomDown = PlotterSettings.KnifeDownCommand;
+				knifeCustomUp = PlotterSettings.KnifeUpCommand;
+				pauseOnKnifeDown = PlotterSettings.PauseOnKnifeDown;
+				// Knife down/up via M3/M5 (or custom): do not emit laser PWM S-values
+				SupportPWM = false;
+			}
+			else
+			{
+				gcodeDragCompensation = false;
+				gcodeXYFeed = Settings.GetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", 1000);
+			}
 			
 			if (SupportPWM)
 				gcodeSpindleSpeed = Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.PowerMax", 255);
@@ -76,9 +108,14 @@ namespace LaserGRBL.SvgConverter
 			// Smoothieware firmware need a value between 0.0 and 1.1
 			if (firmwareType == Firmware.Smoothie)
 				gcodeSpindleSpeed /= 255.0f;
-			gcodeSpindleCmdOn = Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.LaserOn", "M3");
-			gcodeSpindleCmdOff = Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.LaserOff", "M5");
-			SupportPWM = Settings.GetObject("Support Hardware PWM", true); //If Support PWM use S command instead of M3-M4 / M5
+			gcodeSpindleCmdOn = plotterMode && knifeActuation != PlotterSettings.KnifeActuation.ZAxis
+				? knifeCustomDown
+				: Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.LaserOn", "M3");
+			gcodeSpindleCmdOff = plotterMode && knifeActuation != PlotterSettings.KnifeActuation.ZAxis
+				? knifeCustomUp
+				: Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.LaserOff", "M5");
+			if (!plotterMode)
+				SupportPWM = Settings.GetObject("Support Hardware PWM", true); //If Support PWM use S command instead of M3-M4 / M5
 
 			lastMovewasG0 = true;
 			lastx = -1; lasty = -1; lastz = 0; lasts = -1 ; lastg = -1;
@@ -196,43 +233,29 @@ namespace LaserGRBL.SvgConverter
 			drag1stMove = true;
 			origFinalX = lastx;
 			origFinalY = lasty;
-			//if (gcodeComments) { gcodeString.Append("\r\n"); }
 			if (cmt.Length > 0) { cmt = string.Format("({0})", cmt); }
 
 			applyXYFeedRate = true;     // apply XY Feed Rate after each PenDown command (not just after Z-axis)
 
-			//if (gcodeSpindleToggle)
-			//{   if (gcodeComments) gcodeString.AppendFormat("({0})\r\n", "Pen down: Spindle-On");
-			SpindleOn(gcodeString, cmto);
-			//}
-			//if (gcodeZApply)
-			//{   if (gcodeComments) gcodeString.AppendFormat("({0})\r\n", "Pen down: Z-Axis");
-			//    float z_relative = gcodeZDown - lastz;
-			//    if (gcodeRelative)
-			//        gcodeString.AppendFormat("G{0} Z{1} F{2} {3}\r\n", frmtCode(1), frmtNum(z_relative), gcodeZFeed, cmt);
-			//    else
-			//        gcodeString.AppendFormat("G{0} Z{1} F{2} {3}\r\n", frmtCode(1), frmtNum(gcodeZDown), gcodeZFeed, cmt);
+			if (plotterMode && pauseOnKnifeDown)
+				gcodeString.Append("M0 (Pause before knife down)\r\n");
 
-			//    gcodeTime += Math.Abs((gcodeZUp - gcodeZDown) / gcodeZFeed);
-			//    gcodeLines++; lastg = 1; lastf = gcodeZFeed;
-			//    lastz = gcodeZDown;
-			//}
-			//if (gcodePWMEnable)
-			//{   if (gcodeComments) gcodeString.AppendFormat("({0})\r\n", "Pen down: Servo control");
-			//    gcodeString.AppendFormat("M{0} S{1} {2}\r\n", gcodeSpindleCmd, gcodePWMDown, cmt);
-			//    gcodeString.AppendFormat("G{0} P{1}\r\n", frmtCode(4), frmtNum(gcodePWMDlyDown));
-			//    gcodeTime += gcodePWMDlyDown;
-			//    gcodeLines++;
-			//}
-			//if (gcodeIndividualTool)
-			//{   if (gcodeComments) gcodeString.AppendFormat("({0})\r\n", "Pen down: Individual Cmd");
-			//    string[] commands = gcodeIndividualDown.Split(';');
-			//    foreach (string cmd in commands)
-			//    { gcodeString.AppendFormat("{0}\r\n", cmd.Trim()); }
-			//}
-			//if (gcodeComments) gcodeString.Append("\r\n");
-
-			//gcodeDownUp++;
+			if (plotterMode && knifeActuation == PlotterSettings.KnifeActuation.ZAxis)
+			{
+				gcodeString.AppendFormat("G{0} Z{1} F{2}{3}\r\n", frmtCode(1), frmtNum(gcodeZDown), frmtNum(gcodeZFeed),
+					string.IsNullOrEmpty(cmto) ? " (Knife down)" : " (" + cmto + ")");
+				lastz = gcodeZDown;
+				lastg = 1;
+				lastf = gcodeZFeed;
+			}
+			else if (plotterMode && knifeActuation == PlotterSettings.KnifeActuation.CustomCommands)
+			{
+				AppendCustomLines(gcodeString, knifeCustomDown, cmto);
+			}
+			else
+			{
+				SpindleOn(gcodeString, cmto);
+			}
 		}
 
 		public static void PenUp(StringBuilder gcodeString, string cmto = "")
@@ -241,43 +264,40 @@ namespace LaserGRBL.SvgConverter
 			drag1stMove = true;
 			origFinalX = lastx;
 			origFinalY = lasty;
-			//if (gcodeComments) { gcodeString.Append("\r\n"); }
 			if (cmt.Length > 0) { cmt = string.Format("({0})", cmt); }
 
-			//if (gcodeIndividualTool)
-			//{   if (gcodeComments) gcodeString.AppendFormat("({0})\r\n", "Pen up: Individual Cmd");
-			//    string[] commands = gcodeIndividualUp.Split(';'); 
-			//    foreach (string cmd in commands)
-			//    {   gcodeString.AppendFormat("{0}\r\n", cmd.Trim());}
-			//}
-
-			//if (gcodePWMEnable)
-			//{   if (gcodeComments) gcodeString.AppendFormat("({0})\r\n", "Pen up: Servo control");
-			//    gcodeString.AppendFormat("M{0} S{1} {2}\r\n", gcodeSpindleCmd, gcodePWMUp, cmt);
-			//    gcodeString.AppendFormat("G{0} P{1}\r\n", frmtCode(4), frmtNum(gcodePWMDlyUp));
-			//    gcodeTime += gcodePWMDlyUp;
-			//    gcodeLines++;
-			//}
-
-			//if (gcodeZApply)
-			//{   if (gcodeComments) gcodeString.AppendFormat("({0})\r\n", "Pen up: Z-Axis");
-			//    float z_relative = gcodeZUp - lastz;
-			//    if (gcodeRelative)
-			//        gcodeString.AppendFormat("G{0} Z{1} {2}\r\n", frmtCode(0), frmtNum(z_relative), cmt); // use G0 without feedrate
-			//    else
-			//        gcodeString.AppendFormat("G{0} Z{1} {2}\r\n", frmtCode(0), frmtNum(gcodeZUp), cmt); // use G0 without feedrate
-
-			//    gcodeTime += Math.Abs((gcodeZUp - gcodeZDown) / gcodeZFeed);
-			//    gcodeLines++; lastg = 1; lastf = gcodeZFeed;
-			//    lastz = gcodeZUp;
-			//}
-
-			//if (gcodeSpindleToggle)
-			//{   if (gcodeComments) gcodeString.AppendFormat("({0})\r\n", "Pen up: Spindle-Off");
-			SpindleOff(gcodeString, cmto);
-			//}
-			//if (gcodeComments) gcodeString.Append("\r\n");
+			if (plotterMode && knifeActuation == PlotterSettings.KnifeActuation.ZAxis)
+			{
+				gcodeString.AppendFormat("G{0} Z{1}{2}\r\n", frmtCode(0), frmtNum(gcodeZUp),
+					string.IsNullOrEmpty(cmto) ? " (Knife up)" : " (" + cmto + ")");
+				lastz = gcodeZUp;
+				lastg = 0;
+			}
+			else if (plotterMode && knifeActuation == PlotterSettings.KnifeActuation.CustomCommands)
+			{
+				AppendCustomLines(gcodeString, knifeCustomUp, cmto);
+			}
+			else
+			{
+				SpindleOff(gcodeString, cmto);
+			}
 			dragCompi = 0; dragCompj = 0;
+		}
+
+		private static void AppendCustomLines(StringBuilder gcodeString, string commands, string cmt)
+		{
+			if (string.IsNullOrWhiteSpace(commands))
+				return;
+			string[] lines = commands.Split(new[] { ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+			foreach (string raw in lines)
+			{
+				string cmd = raw.Trim();
+				if (cmd.Length == 0) continue;
+				if (!string.IsNullOrEmpty(cmt))
+					gcodeString.AppendFormat("{0} ({1})\r\n", cmd, cmt);
+				else
+					gcodeString.AppendFormat("{0}\r\n", cmd);
+			}
 		}
 
 		public static float lastx, lasty, lastz, lastg = -1, lastf, lasts;

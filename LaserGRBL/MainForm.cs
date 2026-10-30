@@ -108,6 +108,7 @@ namespace LaserGRBL
 			MnUnlock.Visible = Core.UIShowUnlockButtons;
 
 			MnGrbl.Text = Core.Type.ToString();
+			EnsurePlotterMenuItem();
 
 			Core.MachineStatusChanged += OnMachineStatus;
 			Core.OnFileLoaded += OnFileLoaded;
@@ -596,6 +597,8 @@ namespace LaserGRBL
 			if (Core.Type != Firmware.Grbl)
 				FormTitle = FormTitle + $" (for {Core.Type})";
 
+			if (LaserGRBL.Plotter.PlotterSettings.Enabled)
+				FormTitle = FormTitle + " [Plotter]";
 
 			if (Text != FormTitle) Text = FormTitle;
 		}
@@ -763,6 +766,37 @@ namespace LaserGRBL
 		private void settingsToolStripMenuItem_Click(object sender, EventArgs e)
 		{
 			SettingsForm.CreateAndShowDialog(this, Core);
+		}
+
+		private void MnPlotterSettings_Click(object sender, EventArgs e)
+		{
+			LaserGRBL.Plotter.PlotterSettingsForm.CreateAndShowDialog(this);
+			UpdatePlotterModeIndicator();
+		}
+
+		private void EnsurePlotterMenuItem()
+		{
+			// Insert after Settings without touching Designer resources
+			foreach (ToolStripItem it in MnGrbl.DropDownItems)
+				if (it.Name == "MnPlotterSettings")
+					return;
+
+			ToolStripMenuItem mn = new ToolStripMenuItem("Plotter / Knife settings...");
+			mn.Name = "MnPlotterSettings";
+			mn.Click += MnPlotterSettings_Click;
+			int idx = MnGrbl.DropDownItems.IndexOf(settingsToolStripMenuItem);
+			if (idx >= 0)
+				MnGrbl.DropDownItems.Insert(idx + 1, mn);
+			else
+				MnGrbl.DropDownItems.Add(mn);
+
+			IconsMgr.PrepareMenuItem(mn, "mdi-content-cut");
+			UpdatePlotterModeIndicator();
+		}
+
+		private void UpdatePlotterModeIndicator()
+		{
+			RefreshFormTitle();
 		}
 
 		private void openSessionLogToolStripMenuItem_Click(object sender, EventArgs e)

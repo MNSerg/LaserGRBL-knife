@@ -1,3 +1,13 @@
+# LaserGRBL-knife (fork)
+
+Форк [LaserGRBL](https://github.com/arkypita/LaserGRBL) с режимом **плоттера / пассивного ножа (drag knife)**.
+
+- Настройки ножа: меню **Grbl → Plotter / Knife settings...**
+- Описание режима и вопросы по железу: [PLOTTER.md](PLOTTER.md)
+- Сборка релиза под Windows: [BUILD_WINDOWS.md](BUILD_WINDOWS.md)
+
+---
+
 # LaserGRBL [![Donation](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/donate?business=4WQX8HUBXRVUU&no_recurring=0&item_name=LaserGRBL&currency_code=EUR)
 Official website [http://lasergrbl.com](http://lasergrbl.com)
 

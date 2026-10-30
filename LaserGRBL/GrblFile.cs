@@ -443,11 +443,18 @@ namespace LaserGRBL
 			//trace borders
 			if (plist != null) //always true
 			{
+				// Plotter/knife: always prefer inner-first + travel optimization when enabled
+				bool plotter = LaserGRBL.Plotter.PlotterSettings.Enabled;
+				bool forceOptimize = plotter && LaserGRBL.Plotter.PlotterSettings.OptimizePathOrder;
+				bool innerFirst = !plotter || LaserGRBL.Plotter.PlotterSettings.CutInnerFirst;
+
 				//Optimize fast movement
-				if (useOptimizeFast)
+				if (useOptimizeFast || forceOptimize)
 					plist = OptimizePaths(plist, 0 /*ComputeDirectionChangeCost(c, core, true)*/);
-				else
+				else if (innerFirst)
 					plist.Reverse(); //la lista viene fornita da potrace con prima esterni e poi interni, ma per il taglio è meglio il contrario
+				else
+				{ /* keep Potrace order: outer then inner */ }
 
 				List<string> gc = new List<string>();
 				if (supportPWM)
