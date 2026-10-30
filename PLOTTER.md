@@ -63,7 +63,7 @@
 ### E. Релиз
 
 17. Предпочтительный формат: **portable ZIP** (exe + dll) или **установщик** (Inno Setup)?
-18. Целевая ОС: Windows 10/11 x64? Нужен ли .NET Framework 4.x (приложение сейчас на **.NET Framework 4.0**)?
+18. Целевая ОС: Windows 10/11 x64? (сборка переведена на **.NET Framework 4.8**)
 19. Собирать релизы с **GitHub Releases** этого репозитория `MNSerg/LaserGRBL-knife`?
 
 ### F. Тесты

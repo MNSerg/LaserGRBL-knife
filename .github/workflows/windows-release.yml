@@ -10,13 +10,16 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # windows-2022 includes .NET Framework 4.8 targeting pack
+    runs-on: windows-2022
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
 
       - name: Restore NuGet (if any)
         run: |
@@ -27,7 +30,7 @@ jobs:
 
       - name: Build Release
         run: |
-          msbuild LaserGRBL.sln /p:Configuration=Release /p:Platform="Any CPU" /m /v:minimal
+          msbuild LaserGRBL.sln /p:Configuration=Release /p:Platform="Any CPU" /p:TargetFrameworkVersion=v4.8 /m /v:minimal
 
       - name: Stage portable package
         shell: pwsh

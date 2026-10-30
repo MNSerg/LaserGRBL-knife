@@ -1,13 +1,13 @@
 # Сборка LaserGRBL-knife под Windows
 
-Приложение — WinForms на **.NET Framework 4.0+**. Сборка нужна на Windows (или через GitHub Actions).
+Приложение — WinForms на **.NET Framework 4.8**. Сборка нужна на Windows (или через GitHub Actions).
 
 ## Быстрый путь: CI
 
 1. Push в ветку или создайте tag `v1.0.0-knife`
 2. Workflow **Windows Release Build** соберёт Release и выложит artifact `LaserGRBL-knife-portable.zip`
 3. Скачайте ZIP → распакуйте → запустите `LaserGRBL.exe`  
-   Требуется установленный [.NET Framework 4.x](https://dotnet.microsoft.com/download/dotnet-framework) (обычно уже есть на Win10/11).
+   Требуется установленный [.NET Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework) (обычно уже есть на Win10/11).
 
 Ручной запуск workflow: GitHub → Actions → Windows Release Build → Run workflow.
 
