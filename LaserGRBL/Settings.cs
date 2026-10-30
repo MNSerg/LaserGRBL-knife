@@ -198,5 +198,11 @@ namespace LaserGRBL
             return dic.ContainsKey(key);
         }
 
+		/// <summary>Raw lookup without type check (for tolerant numeric reads).</summary>
+		internal static object TryGetRaw(string key)
+		{
+			return ExistObject(key) ? dic[key] : null;
+		}
+
     }
 }

@@ -52,7 +52,7 @@ namespace LaserGRBL.Plotter
 		/// <summary>Distance from swivel pivot to blade tip (mm). Owner knife: 3.6 mm.</summary>
 		public static float BladeOffsetMm
 		{
-			get { return Settings.GetObject(KeyBladeOffset, 3.6f); }
+			get { return ReadFloat(KeyBladeOffset, 3.6f); }
 			set { Settings.SetObject(KeyBladeOffset, value); }
 		}
 
@@ -62,15 +62,32 @@ namespace LaserGRBL.Plotter
 		/// </summary>
 		public static float MinCornerRadiusMm
 		{
-			get { return Settings.GetObject(KeyMinCornerRadius, 2f); }
+			get { return ReadFloat(KeyMinCornerRadius, 2f); }
 			set { Settings.SetObject(KeyMinCornerRadius, value); }
 		}
 
 		/// <summary>Minimum direction-change angle (degrees) that inserts a drag-knife compensation arc.</summary>
 		public static float SwivelAngleDeg
 		{
-			get { return Settings.GetObject(KeySwivelAngle, 30f); }
+			get { return ReadFloat(KeySwivelAngle, 30f); }
 			set { Settings.SetObject(KeySwivelAngle, value); }
+		}
+
+		/// <summary>Settings.bin may store float/double/int/decimal — accept all.</summary>
+		internal static float ReadFloat(string key, float def)
+		{
+			try
+			{
+				object o = Settings.TryGetRaw(key);
+				if (o == null) return def;
+				if (o is float) return (float)o;
+				if (o is double) return (float)(double)o;
+				if (o is int) return (int)o;
+				if (o is decimal) return (float)(decimal)o;
+				if (o is long) return (long)o;
+			}
+			catch { }
+			return def;
 		}
 
 		public static int CutSpeed

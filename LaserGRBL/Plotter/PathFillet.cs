@@ -236,7 +236,8 @@ namespace LaserGRBL.Plotter
 			float c = PlotterPath.Dist(A, B);
 			float area2 = Math.Abs((B.X - A.X) * (C.Y - A.Y) - (B.Y - A.Y) * (C.X - A.X));
 			if (area2 < 1e-10f) return float.PositiveInfinity;
-			return a * b * c / area2; // = abc/(2*area) with area2=2*area → abc/area2
+			// area2 = 2*K → R = abc/(4K) = abc/(2*area2)
+			return a * b * c / (2f * area2);
 		}
 
 		static PlotterPoint Sub(PlotterPoint a, PlotterPoint b)

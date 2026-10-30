@@ -20,6 +20,7 @@ using System.Windows.Forms;
 using System.Xml.Linq;
 using System.IO;
 using System.Globalization;
+using LaserGRBL.Plotter;
 using Point = System.Windows.Point;
 
 namespace LaserGRBL.SvgConverter
@@ -42,6 +43,10 @@ namespace LaserGRBL.SvgConverter
 		private static float factor_Em2Px = 150;
 
 		private StringBuilder gcodeString = new StringBuilder();
+		private bool plotterCollect = false;
+		private List<PlotterPath> plotterPaths;
+		private PlotterPath plotterCurrent;
+		private GrblCore plotterCore;
 		private int svgBezierAccuracy = 12;      // applied line segments at bezier curves
 		private bool svgScaleApply = false;      // try to scale final GCode if true
 		private float svgMaxSize = 100;          // final GCode size (greater dimension) if scale is applied
@@ -114,11 +119,39 @@ namespace LaserGRBL.SvgConverter
 			gcode.setup(core);          // initialize GCode creation (get stored settings for export)
 			gcode.setRapidNum(Settings.GetObject("Disable G0 fast skip", false) ? 1 : 0);
 
+			plotterCollect = PlotterSettings.Enabled;
+			plotterCore = core;
+			plotterPaths = plotterCollect ? new List<PlotterPath>() : null;
+			plotterCurrent = null;
+
+			if (plotterCollect)
+			{
+				startConvert(svgCode);
+				FinishPlotterPath();
+				return PlotterPathEmitter.Emit(plotterPaths, core, "SVG import (plotter)");
+			}
+
 			gcode.PutInitialCommand(gcodeString);
 			startConvert(svgCode);
 			gcode.PutFinalCommand(gcodeString);
 
 			return gcodeString.Replace(',', '.').ToString();
+		}
+
+		private void FinishPlotterPath()
+		{
+			if (plotterCurrent != null && plotterCurrent.Points.Count >= 2)
+			{
+				PlotterPoint a = plotterCurrent.Points[0];
+				PlotterPoint b = plotterCurrent.Points[plotterCurrent.Points.Count - 1];
+				if (PlotterPath.Dist(a, b) < 0.05f)
+				{
+					plotterCurrent.Points.RemoveAt(plotterCurrent.Points.Count - 1);
+					plotterCurrent.Closed = true;
+				}
+				plotterPaths.Add(plotterCurrent);
+			}
+			plotterCurrent = null;
 		}
 
 		/// <summary>
@@ -1264,6 +1297,15 @@ namespace LaserGRBL.SvgConverter
 			Point coord = translateXY(x, y);
 			lastGCX = coord.X; lastGCY = coord.Y;
 			lastSetGCX = coord.X; lastSetGCY = coord.Y;
+			if (plotterCollect)
+			{
+				FinishPlotterPath();
+				plotterCurrent = new PlotterPath();
+				plotterCurrent.Add((float)coord.X, (float)coord.Y);
+				penIsDown = false;
+				isReduceOk = false;
+				return;
+			}
 			gcodePenUp(cmt);
 			gcode.MoveToRapid(gcodeString, coord, cmt);
 			if (svgPausePenDown) { /*gcode.Pause(gcodeString, "Pause before Pen Down");*/ }
@@ -1275,6 +1317,12 @@ namespace LaserGRBL.SvgConverter
 		/// </summary>
 		private void gcodeStopPath(string cmt)
 		{
+			if (plotterCollect)
+			{
+				FinishPlotterPath();
+				penIsDown = false;
+				return;
+			}
 			if (gcodeReduce)
 			{
 				if ((lastSetGCX != lastGCX) || (lastSetGCY != lastGCY)) // restore last skipped point for accurat G2/G3 use
@@ -1307,6 +1355,19 @@ namespace LaserGRBL.SvgConverter
 		{
 			Point coord = translateXY(orig);
 			rejectPoint = false;
+			if (plotterCollect)
+			{
+				if (plotterCurrent == null)
+				{
+					plotterCurrent = new PlotterPath();
+					plotterCurrent.Add((float)coord.X, (float)coord.Y);
+				}
+				else
+					plotterCurrent.Add((float)coord.X, (float)coord.Y);
+				lastGCX = coord.X; lastGCY = coord.Y;
+				penIsDown = true;
+				return;
+			}
 			gcodePenDown(cmt);
 			if (gcodeReduce && isReduceOk)
 			{
@@ -1334,6 +1395,28 @@ namespace LaserGRBL.SvgConverter
 		{
 			Point coordxy = translateXY(x, y);
 			Point coordij = translateIJ(i, j);
+			if (plotterCollect)
+			{
+				// Approximate CCW arc as polyline for fillet/drag pipeline
+				double cx = lastGCX + coordij.X;
+				double cy = lastGCY + coordij.Y;
+				double a0 = Math.Atan2(lastGCY - cy, lastGCX - cx);
+				double a1 = Math.Atan2(coordxy.Y - cy, coordxy.X - cx);
+				double sweep = a1 - a0;
+				while (sweep < 0) sweep += 2 * Math.PI;
+				double r = Math.Sqrt(coordij.X * coordij.X + coordij.Y * coordij.Y);
+				int segs = Math.Max(4, (int)Math.Ceiling(sweep / (Math.PI / 12)));
+				if (plotterCurrent == null)
+					plotterCurrent = new PlotterPath();
+				for (int s = 1; s <= segs; s++)
+				{
+					double a = a0 + sweep * s / segs;
+					plotterCurrent.Add((float)(cx + r * Math.Cos(a)), (float)(cy + r * Math.Sin(a)));
+				}
+				lastGCX = coordxy.X; lastGCY = coordxy.Y;
+				penIsDown = true;
+				return;
+			}
 			gcodePenDown(cmt);
 			if (gcodeReduce && isReduceOk)      // restore last skipped point for accurat G2/G3 use
 			{

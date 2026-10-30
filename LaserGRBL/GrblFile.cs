@@ -495,19 +495,27 @@ namespace LaserGRBL
 				{ /* keep Potrace order: outer then inner (plotter continuous cut) */ }
 
 				List<string> gc = new List<string>();
-				// Keep approach state if filling already moved; otherwise reset for borders-only jobs
-				if (flist == null)
-					Potrace.ResetPlotterApproach();
-				if (plotterAlwaysDown)
-					gc.AddRange(Potrace.Export2GCode(plist, c.oX, c.oY, c.res, "", "", bmp.Size, skipcmd));
-				else if (supportPWM)
-					gc.AddRange(Potrace.Export2GCode(plist, c.oX, c.oY, c.res, $"S{c.maxPower}", "S0", bmp.Size, skipcmd));
+				if (plotterMode)
+				{
+					// Unified plotter pipeline: fillet sharp corners + drag-knife compensation
+					var paths = LaserGRBL.Plotter.PotraceToPlotter.Convert(plist, c.oX, c.oY, c.res);
+					string gcodeText = LaserGRBL.Plotter.PlotterPathEmitter.Emit(paths, core, "Potrace vectorize (plotter)");
+					gc.AddRange(gcodeText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries));
+				}
 				else
-					gc.AddRange(Potrace.Export2GCode(plist, c.oX, c.oY, c.res, c.lOn, c.lOff, bmp.Size, skipcmd));
+				{
+					if (flist == null)
+						Potrace.ResetPlotterApproach();
+					if (supportPWM)
+						gc.AddRange(Potrace.Export2GCode(plist, c.oX, c.oY, c.res, $"S{c.maxPower}", "S0", bmp.Size, skipcmd));
+					else
+						gc.AddRange(Potrace.Export2GCode(plist, c.oX, c.oY, c.res, c.lOn, c.lOff, bmp.Size, skipcmd));
+				}
 
 				// For marlin, need to specify G1 each time :
 				//list.Add(new GrblCommand(String.Format("G1 F{0}", c.borderSpeed)));
-				list.Add(new GrblCommand(String.Format("F{0}", plotterMode ? LaserGRBL.Plotter.PlotterSettings.CutSpeed : c.borderSpeed)));
+				if (!plotterMode)
+					list.Add(new GrblCommand(String.Format("F{0}", c.borderSpeed)));
 				foreach (string code in gc)
 					list.Add(new GrblCommand(code));
 			}
