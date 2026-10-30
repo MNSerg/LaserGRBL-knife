@@ -440,6 +440,7 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Plotter\DxfImporter.cs" />
+    <Compile Include="Plotter\PlotterPath.cs" />
     <Compile Include="Plotter\PathOptimizerNotes.cs" />
     <Compile Include="Telegram.cs" />
     <Compile Include="Tools\DataProtector.cs" />

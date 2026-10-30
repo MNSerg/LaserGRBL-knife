@@ -71,6 +71,14 @@ namespace LaserGRBL.SvgConverter
 		private static string knifeCustomUp = "M5";
 		private static bool pauseOnKnifeDown = false;
 		private static bool continuousFirstApproach = true;
+		private static bool designBoundsValid = false;
+		private static float designMinX, designMinY, designMaxX, designMaxY;
+
+		public static void SetDesignBounds(float minX, float minY, float maxX, float maxY)
+		{
+			designMinX = minX; designMinY = minY; designMaxX = maxX; designMaxY = maxY;
+			designBoundsValid = maxX > minX && maxY > minY;
+		}
 
 		public static void setup(GrblCore core)
 		{
@@ -126,6 +134,8 @@ namespace LaserGRBL.SvgConverter
 			lastMovewasG0 = true;
 			lastx = -1; lasty = -1; lastz = 0; lasts = -1 ; lastg = -1;
 			continuousFirstApproach = true;
+			// designBoundsValid kept if caller set it after setup; cleared when disabled
+			if (!plotterMode) designBoundsValid = false;
 		}
 
 		public static bool reduceGCode
@@ -322,6 +332,25 @@ namespace LaserGRBL.SvgConverter
 
 		public static float lastx, lasty, lastz, lastg = -1, lastf, lasts;
 		public static bool lastMovewasG0 = true;
+
+		/// <summary>
+		/// Sync internal XY without emitting motion. Used so the first knife entry
+		/// can be planned from a virtual point outside the artwork (AlwaysDown still cuts on every real move).
+		/// </summary>
+		public static void SetPosition(float x, float y)
+		{
+			lastx = x;
+			lasty = y;
+			origFinalX = x;
+			origFinalY = y;
+			drag1stMove = true;
+			dragCompi = 0;
+			dragCompj = 0;
+			continuousFirstApproach = false;
+			lastMovewasG0 = true;
+			applyXYFeedRate = true;
+		}
+
 		public static void MoveTo(StringBuilder gcodeString, Point coord, string cmt = "")
 		{ MoveSplit(gcodeString, 1, (float)coord.X, (float)coord.Y, applyXYFeedRate, cmt); }
 		public static void MoveTo(StringBuilder gcodeString, float x, float y, string cmt = "")
@@ -334,10 +363,20 @@ namespace LaserGRBL.SvgConverter
 		}
 		public static void MoveToRapid(StringBuilder gcodeString, float x, float y, string cmt = "")
 		{
-			// Continuous knife: first approach is still G0 (get over start without cutting from unknown pose),
-			// later contour joins stay G1 so the blade remains engaged in the material.
-			if (plotterMode && continuousCut && !continuousFirstApproach)
+			// AlwaysDown: G0 still cuts. Never plunge through a contour to the start point —
+			// enter from the left of the design bbox, then G1 to the contour.
+			if (plotterMode && continuousCut)
 			{
+				if (continuousFirstApproach)
+				{
+					float margin = PlotterSettings.LeadInMm > 0.01f ? PlotterSettings.LeadInMm : 5f;
+					float entryX = designBoundsValid ? (designMinX - margin) : (x - margin);
+					SetPosition(entryX, y);
+					MoveSplit(gcodeString, 1, x, y, true, "outside entry");
+					continuousFirstApproach = false;
+					lastMovewasG0 = false;
+					return;
+				}
 				MoveSplit(gcodeString, 1, x, y, true,
 					string.IsNullOrEmpty(cmt) ? "cut travel" : cmt);
 				lastMovewasG0 = false;
@@ -345,8 +384,6 @@ namespace LaserGRBL.SvgConverter
 			}
 			Move(gcodeString, rapidnum, x, y, false, cmt);
 			lastMovewasG0 = true;
-			if (plotterMode && continuousCut)
-				continuousFirstApproach = false;
 		}
 
 		// MoveSplit breaks down a line to line segments with given max. length

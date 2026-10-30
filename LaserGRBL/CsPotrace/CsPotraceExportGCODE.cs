@@ -42,8 +42,36 @@ namespace CsPotrace
 			}
 
 			List<string> rv = new List<string>();
+			double oxs = oX * scale;
+			double oys = oY * scale;
+
+			bool continuous = LaserGRBL.Plotter.PlotterSettings.UseContinuousCut;
+			plotterFirstApproach = true;
+			if (continuous && list != null && list.Count > 0)
+			{
+				// AlwaysDown knife cuts on G0 too — enter from outside the artwork bbox
+				double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+				foreach (List<CsPotrace.Curve> Curves in list)
+				{
+					if (Curves == null) continue;
+					foreach (CsPotrace.Curve c in Curves)
+					{
+						ExpandBBox(c.A.X + oxs, c.A.Y + oys, scale, ref minX, ref minY, ref maxX, ref maxY);
+						ExpandBBox(c.B.X + oxs, c.B.Y + oys, scale, ref minX, ref minY, ref maxX, ref maxY);
+					}
+				}
+				plotterBBoxMinX = minX;
+				plotterBBoxValid = minX < maxX;
+
+				// Rotate first contour so we start at its leftmost vertex —
+				// horizontal entry from the left then cannot cross the interior.
+				RotateClosedPathToLeftmost(list[0]);
+			}
+			else
+				plotterBBoxValid = false;
+
 			foreach (List<CsPotrace.Curve> Curves in list)
-				rv.AddRange(GetPathGC(Curves, lOn, lOff, oX * scale, oY * scale, scale, g, skipcmd));
+				rv.AddRange(GetPathGC(Curves, lOn, lOff, oxs, oys, scale, g, skipcmd));
 
 			if (debug)
 			{
@@ -53,6 +81,39 @@ namespace CsPotrace
 				bmp.Dispose();
 			}
 			return rv;
+		}
+
+		private static void ExpandBBox(double x, double y, double scale, ref double minX, ref double minY, ref double maxX, ref double maxY)
+		{
+			double X = x / scale;
+			double Y = y / scale;
+			if (X < minX) minX = X;
+			if (Y < minY) minY = Y;
+			if (X > maxX) maxX = X;
+			if (Y > maxY) maxY = Y;
+		}
+
+		private static void RotateClosedPathToLeftmost(List<CsPotrace.Curve> curves)
+		{
+			if (curves == null || curves.Count < 2) return;
+			int best = 0;
+			double bestX = curves[0].A.X, bestY = curves[0].A.Y;
+			for (int i = 1; i < curves.Count; i++)
+			{
+				dPoint a = curves[i].A;
+				if (a.X < bestX - 1e-9 || (Math.Abs(a.X - bestX) < 1e-9 && a.Y < bestY))
+				{
+					best = i;
+					bestX = a.X;
+					bestY = a.Y;
+				}
+			}
+			if (best == 0) return;
+			List<CsPotrace.Curve> rotated = new List<CsPotrace.Curve>(curves.Count);
+			for (int i = best; i < curves.Count; i++) rotated.Add(curves[i]);
+			for (int i = 0; i < best; i++) rotated.Add(curves[i]);
+			curves.Clear();
+			curves.AddRange(rotated);
 		}
 
 		private static List<string> GetPathGC(List<CsPotrace.Curve> Curves, string lOn, string lOff, double oX, double oY, double scale, Graphics g, string skipcmd)
@@ -126,11 +187,14 @@ namespace CsPotrace
 		}
 
 		private static bool plotterFirstApproach = true;
+		private static bool plotterBBoxValid = false;
+		private static double plotterBBoxMinX = 0;
 
-		/// <summary>Call before exporting a new job so the first contour still uses G0.</summary>
+		/// <summary>Call before exporting a new job so the first contour uses outside entry.</summary>
 		public static void ResetPlotterApproach()
 		{
 			plotterFirstApproach = true;
+			plotterBBoxValid = false;
 		}
 
 		private static void OnPathBegin(List<CsPotrace.Curve> Curves, string lOn, double oX, double oY, double scale, List<string> rv, string skipcmd)
@@ -138,17 +202,36 @@ namespace CsPotrace
 			if (Curves.Count > 0)
 			{
 				bool continuous = LaserGRBL.Plotter.PlotterSettings.UseContinuousCut;
-				string move;
+				string sx = formatnumber(Curves[0].A.X + oX, scale);
+				string sy = formatnumber(Curves[0].A.Y + oY, scale);
+
 				if (continuous)
 				{
-					move = plotterFirstApproach ? "G0" : "G1";
-					plotterFirstApproach = false;
+					// Blade is always down: G0 still cuts. Enter from left of bbox on first path.
+					if (plotterFirstApproach && plotterBBoxValid)
+					{
+						float margin = LaserGRBL.Plotter.PlotterSettings.LeadInMm > 0.01f
+							? LaserGRBL.Plotter.PlotterSettings.LeadInMm : 5f;
+						double startXm = (Curves[0].A.X + oX) / scale;
+						double startYm = (Curves[0].A.Y + oY) / scale;
+						double entryXm = plotterBBoxMinX - margin;
+						rv.Add(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+							"G1 X{0:0.###} Y{1:0.###} (outside entry)", entryXm, startYm));
+						rv.Add(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+							"G1 X{0:0.###} Y{1:0.###}", startXm, startYm));
+						plotterFirstApproach = false;
+					}
+					else
+					{
+						rv.Add(String.Format("G1 X{0} Y{1}", sx, sy));
+						plotterFirstApproach = false;
+					}
 				}
 				else
-					move = skipcmd;
-				// go to path start (G0 first, then G1 cut-travel between contours)
-				rv.Add(String.Format("{0} X{1} Y{2}", move, formatnumber(Curves[0].A.X + oX, scale), formatnumber(Curves[0].A.Y + oY, scale)));
-				// turn on laser / knife — skipped when always-down continuous cut
+				{
+					rv.Add(String.Format("{0} X{1} Y{2}", skipcmd, sx, sy));
+				}
+
 				if (!string.IsNullOrEmpty(lOn) && !(continuous && LaserGRBL.Plotter.PlotterSettings.DownMode == LaserGRBL.Plotter.PlotterSettings.KnifeActuation.AlwaysDown))
 					rv.Add(lOn);
 			}
