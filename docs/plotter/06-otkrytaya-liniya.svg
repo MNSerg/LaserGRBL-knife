@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="320" viewBox="0 0 900 320">
+  <rect width="900" height="320" fill="#fbf7f1"/>
+  <text x="24" y="34" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#2c2416">6. Открытая линия длиннее рисунка с обоих концов</text>
+  <line x1="200" y1="140" x2="580" y2="140" stroke="#1d4e89" stroke-width="5"/>
+  <text x="330" y="118" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#1d4e89">линия рисунка</text>
+  <line x1="90" y1="140" x2="200" y2="140" stroke="#1f8a4c" stroke-width="5"/>
+  <circle cx="90" cy="140" r="7" fill="#1f8a4c"/>
+  <text x="80" y="180" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#145c34">заход</text>
+  <line x1="580" y1="140" x2="720" y2="140" stroke="#c4372f" stroke-width="5"/>
+  <circle cx="720" cy="140" r="7" fill="#c4372f"/>
+  <text x="620" y="180" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#c4372f">перерез</text>
+  <text x="24" y="240" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#2c2416">Нож не возвращается в начало. Так режутся штрихи «центральной линии».</text>
+  <text x="24" y="266" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#2c2416">Нулевые заход и перерез оставляют линию ровно по рисунку.</text>
+  <text x="24" y="292" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#2c2416">Лезвие при этом может подойти к началу ещё повёрнутым в сторону.</text>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360">
+  <rect width="900" height="360" fill="#fbf7f1"/>
+  <text x="24" y="36" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#2c2416">2. Прямая линия: остриё сзади, станок впереди</text>
+  <line x1="70" y1="150" x2="700" y2="150" stroke="#1d4e89" stroke-width="5"/>
+  <text x="280" y="128" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#1d4e89">рисунок. Остриё едет ровно по этой линии</text>
+  <circle cx="280" cy="150" r="9" fill="#1f8a4c"/>
+  <text x="230" y="196" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#145c34">остриё</text>
+  <circle cx="460" cy="150" r="9" fill="#e07a2f"/>
+  <text x="410" y="196" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#c45c26">ось станка</text>
+  <line x1="280" y1="150" x2="460" y2="150" stroke="#2c2416" stroke-width="3"/>
+  <text x="310" y="104" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#2c2416">смещение лезвия, у вас 3,6 мм</text>
+  <path d="M620 150 L760 150" fill="none" stroke="#2c2416" stroke-width="2" marker-end="url(#a)"/>
+  <text x="660" y="136" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#2c2416">ход</text>
+  <text x="24" y="250" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#2c2416">В окне LaserGRBL виден путь оси. На прямой он совпадает с рисунком,</text>
+  <text x="24" y="274" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#2c2416">но начинается и заканчивается на 3,6 мм дальше по ходу ножа.</text>
+  <text x="24" y="306" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#2c2416">Резина режется остриём, то есть по синей линии.</text>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0 0 L6 3 L0 6 Z" fill="#2c2416"/>
+    </marker>
+  </defs>
+</svg>

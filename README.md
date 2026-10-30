@@ -7,6 +7,8 @@ LaserGRBL is a Windows GUI for [GRBL](https://github.com/gnea/grbl/wiki). Unlike
 
 This copy can drive a laser that was converted into a plotter with a passive swivel blade. Laser jobs are unchanged until plotter mode is turned on.
 
+A plain-language guide to every plotter setting, with pictures: [docs/plotter-nastroiki.md](docs/plotter-nastroiki.md).
+
 Open **Grbl → Plotter...** (Плоттер...). The machine this mode is set up for has no Z axis: blade height is set by hand before the job, and the program sends only X and Y. Default blade offset is 3.60 mm (editable), overcut and lead-in match it, cut speed starts at 600 mm/min (editable in the same dialog and in the import window), one pass. A move between separate contours also cuts, because the knife stays down, so every XY move is G1 at cut speed. Aim the positioning laser (10 mm to the right of the blade, adjustable) at the bottom-left corner of the sheet and zero XY. The program then parks the blade 20 mm outside that corner, to the left and toward you, and only after that travels into the first contour. Hatch fill is not generated. Vectorize keeps outlines and holes; Centerline keeps stroke lines. DXF files (ASCII) open from the same File dialog as SVG: LINE, LWPOLYLINE, POLYLINE, ARC, CIRCLE, ELLIPSE, SPLINE and block INSERT.
 
 **File → Apply plotter to loaded file** runs the same compensation on G-code that is already open. Do not run it twice on the same file.

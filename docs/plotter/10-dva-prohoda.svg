@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="330" viewBox="0 0 900 330">
+  <rect width="900" height="330" fill="#fbf7f1"/>
+  <text x="24" y="34" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#2c2416">10. Два прохода: сначала контур целиком, и только потом следующая фигура</text>
+  <line x1="120" y1="140" x2="680" y2="140" stroke="#1d4e89" stroke-width="7"/>
+  <path d="M160 112 L600 112" fill="none" stroke="#e07a2f" stroke-width="3" marker-end="url(#a)"/>
+  <text x="320" y="96" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#c45c26">первый проход</text>
+  <path d="M600 175 L180 175" fill="none" stroke="#c4372f" stroke-width="3" marker-end="url(#b)"/>
+  <text x="280" y="198" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#c4372f">возврат к заходу тоже режет резину</text>
+  <path d="M180 230 L600 230" fill="none" stroke="#1f8a4c" stroke-width="3" marker-end="url(#c)"/>
+  <text x="300" y="258" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#145c34">второй проход по той же линии</text>
+  <text x="24" y="304" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#2c2416">Второй проход не опускает нож глубже. Высоту вы ставите рукой. Он только проходит по резу ещё раз.</text>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#e07a2f"/></marker>
+    <marker id="b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#c4372f"/></marker>
+    <marker id="c" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#1f8a4c"/></marker>
+  </defs>
+</svg>
