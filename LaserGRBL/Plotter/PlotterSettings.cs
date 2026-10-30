@@ -14,6 +14,7 @@ namespace LaserGRBL.Plotter
 	{
 		public const string KeyEnabled = "Plotter.Enabled";
 		public const string KeyBladeOffset = "Plotter.BladeOffsetMm";
+		public const string KeyMinCornerRadius = "Plotter.MinCornerRadiusMm";
 		public const string KeySwivelAngle = "Plotter.SwivelAngleDeg";
 		public const string KeyCutSpeed = "Plotter.CutSpeed";
 		public const string KeyTravelSpeed = "Plotter.TravelSpeed";
@@ -48,14 +49,24 @@ namespace LaserGRBL.Plotter
 			set { Settings.SetObject(KeyEnabled, value); }
 		}
 
-		/// <summary>Distance from swivel pivot to blade tip (mm).</summary>
+		/// <summary>Distance from swivel pivot to blade tip (mm). Owner knife: 3.6 mm.</summary>
 		public static float BladeOffsetMm
 		{
-			get { return Settings.GetObject(KeyBladeOffset, 0.5f); }
+			get { return Settings.GetObject(KeyBladeOffset, 3.6f); }
 			set { Settings.SetObject(KeyBladeOffset, value); }
 		}
 
-		/// <summary>Minimum direction-change angle (degrees) that inserts a compensation arc.</summary>
+		/// <summary>
+		/// Minimum fillet radius (mm) for sharp corners. Softer existing arcs with R &gt;= this
+		/// are left as-is; sharper corners are rounded to this radius before drag compensation.
+		/// </summary>
+		public static float MinCornerRadiusMm
+		{
+			get { return Settings.GetObject(KeyMinCornerRadius, 2f); }
+			set { Settings.SetObject(KeyMinCornerRadius, value); }
+		}
+
+		/// <summary>Minimum direction-change angle (degrees) that inserts a drag-knife compensation arc.</summary>
 		public static float SwivelAngleDeg
 		{
 			get { return Settings.GetObject(KeySwivelAngle, 30f); }

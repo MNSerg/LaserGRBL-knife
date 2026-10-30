@@ -143,6 +143,13 @@ namespace LaserGRBL.SvgConverter
 				matrixGroup[i].SetIdentity();
 
 			parseGlobals(svgCode);
+			// Rough design bounds for plotter outside-entry (mm approx from SVG px / 96dpi)
+			if (LaserGRBL.Plotter.PlotterSettings.UseContinuousCut && svgWidthPx > 0 && svgHeightPx > 0)
+			{
+				float wMm = svgWidthPx * 25.4f / 96f;
+				float hMm = svgHeightPx * 25.4f / 96f;
+				gcode.SetDesignBounds(0, 0, wMm, hMm);
+			}
 			if (!svgNodesOnly)
 				parseBasicElements(svgCode, 1);
 			parsePath(svgCode, 1);

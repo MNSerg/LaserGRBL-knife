@@ -12,6 +12,7 @@ namespace LaserGRBL.Plotter
 		CheckBox CbEnabled;
 		CheckBox CbContinuous;
 		NumericUpDown NudBladeOffset;
+		NumericUpDown NudMinCornerR;
 		NumericUpDown NudSwivelAngle;
 		NumericUpDown NudCutSpeed;
 		NumericUpDown NudTravelSpeed;
@@ -43,7 +44,7 @@ namespace LaserGRBL.Plotter
 			MaximizeBox = false;
 			MinimizeBox = false;
 			StartPosition = FormStartPosition.CenterParent;
-			ClientSize = new Size(520, 580);
+			ClientSize = new Size(520, 620);
 			Font = new Font("Segoe UI", 9f);
 
 			BackColor = ColorScheme.FormBackColor;
@@ -59,11 +60,15 @@ namespace LaserGRBL.Plotter
 			CbContinuous = AddCheck(left, ref y, "Непрерывный рез (без подъёма; переезды тоже режут)");
 			y += 4;
 
-			AddLabel(left, y, "Смещение лезвия от оси поворота (мм)");
+			AddLabel(left, y, "Смещение лезвия от оси (мм)");
 			NudBladeOffset = AddNud(ctrlLeft, y, ctrlW, 0, 20, 0.05m, 2);
 			y += row;
 
-			AddLabel(left, y, "Порог угла для дуги поворота (°)");
+			AddLabel(left, y, "Мин. радиус скругления углов (мм)");
+			NudMinCornerR = AddNud(ctrlLeft, y, ctrlW, 0, 50, 0.1m, 2);
+			y += row;
+
+			AddLabel(left, y, "Порог угла для drag-дуги (°)");
 			NudSwivelAngle = AddNud(ctrlLeft, y, ctrlW, 1, 180, 1, 0);
 			y += row;
 
@@ -132,8 +137,9 @@ namespace LaserGRBL.Plotter
 				Width = ClientSize.Width - 32,
 				Height = 48,
 				ForeColor = ColorScheme.FormForeColor,
-				Text = "Подсказка: kiss-cut = надрез верхнего слоя (винил); сквозной рез = насквозь. " +
-				       "Lead-in выравнивает лезвие до контура; overcut добивает угол на замкнутом пути."
+				Text = "Острые углы скругляются до мин. радиуса; уже плавные дуги (R ≥ мин.) не трогаем. " +
+				       "Смещение лезвия — отставание острия от оси (drag-компенсация). " +
+				       "Если мин. радиус < смещения, лезвие на тугом повороте может не доворачиваться."
 			};
 			Controls.Add(LblHelp);
 
@@ -235,6 +241,7 @@ namespace LaserGRBL.Plotter
 			CbEnabled.Checked = PlotterSettings.Enabled;
 			CbContinuous.Checked = PlotterSettings.ContinuousCut;
 			NudBladeOffset.Value = Clamp(NudBladeOffset, (decimal)PlotterSettings.BladeOffsetMm);
+			NudMinCornerR.Value = Clamp(NudMinCornerR, (decimal)PlotterSettings.MinCornerRadiusMm);
 			NudSwivelAngle.Value = Clamp(NudSwivelAngle, (decimal)PlotterSettings.SwivelAngleDeg);
 			NudCutSpeed.Value = Clamp(NudCutSpeed, PlotterSettings.CutSpeed);
 			NudTravelSpeed.Value = Clamp(NudTravelSpeed, PlotterSettings.TravelSpeed);
@@ -280,6 +287,7 @@ namespace LaserGRBL.Plotter
 			PlotterSettings.Enabled = CbEnabled.Checked;
 			PlotterSettings.ContinuousCut = CbContinuous.Checked;
 			PlotterSettings.BladeOffsetMm = (float)NudBladeOffset.Value;
+			PlotterSettings.MinCornerRadiusMm = (float)NudMinCornerR.Value;
 			PlotterSettings.SwivelAngleDeg = (float)NudSwivelAngle.Value;
 			PlotterSettings.CutSpeed = (int)NudCutSpeed.Value;
 			PlotterSettings.TravelSpeed = (int)NudTravelSpeed.Value;
