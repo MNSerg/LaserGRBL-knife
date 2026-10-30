@@ -340,11 +340,9 @@ namespace LaserGRBL.RasterConverter
 				RbNoProcessing.Enabled = false;
 				if (RbLineToLineTracing.Checked || RbDithering.Checked || RbNoProcessing.Checked)
 					RbVectorize.Checked = true;
-				if (GrblFile.RasterFilling(IP.FillingDirection))
-				{
-					IP.FillingDirection = ImageProcessor.Direction.None;
-					CbFillingDirection.SelectedItem = ImageProcessor.Direction.None;
-				}
+				IP.FillingDirection = ImageProcessor.Direction.None;
+				CbFillingDirection.SelectedItem = ImageProcessor.Direction.None;
+				CbFillingDirection.Enabled = false;
 				if (Text.IndexOf("Plotter", StringComparison.OrdinalIgnoreCase) < 0 && Text.IndexOf("Плоттер", StringComparison.Ordinal) < 0)
 					Text = Text + " — " + Plotter.PlotterSettingsForm.Tr("Plotter", "Плоттер");
 			}

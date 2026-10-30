@@ -20,14 +20,19 @@ namespace LaserGRBL.Plotter
 			sb.Append(" lead-in ").Append(PlotGeom.Num(cfg.LeadInMm)).Append(")\r\n");
 			sb.Append("(cut F").Append(cfg.CutSpeed.ToString(System.Globalization.CultureInfo.InvariantCulture));
 			sb.Append(" travel ");
-			if (cfg.TravelSpeed <= 0) sb.Append("rapid");
+			if (cfg.PenMode == PlotterPenMode.Manual && cfg.TravelSpeed <= 0) sb.Append("cut feed");
+			else if (cfg.TravelSpeed <= 0) sb.Append("rapid");
 			else sb.Append("F").Append(cfg.TravelSpeed.ToString(System.Globalization.CultureInfo.InvariantCulture));
 			sb.Append(" paths ").Append(pathCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
 			sb.Append(" pen ").Append(cfg.PenMode.ToString()).Append(")\r\n");
+			if (cfg.PenMode == PlotterPenMode.Manual)
+				sb.Append("(manual knife height, blade stays down)\r\n");
 			sb.Append("G90\r\n");
 
+			bool manual = cfg.PenMode == PlotterPenMode.Manual;
 			bool down = false;
-			PenUp(sb, cfg);
+			if (!manual)
+				PenUp(sb, cfg);
 			double x = double.NaN;
 			double y = double.NaN;
 			double cutLength = 0;
@@ -39,7 +44,7 @@ namespace LaserGRBL.Plotter
 					PlotMove move = moves[i];
 					if (!move.Cut)
 					{
-						if (down)
+						if (down && !manual)
 						{
 							PenUp(sb, cfg);
 							down = false;
@@ -53,7 +58,7 @@ namespace LaserGRBL.Plotter
 						continue;
 					}
 
-					if (!down)
+					if (!down && !manual)
 					{
 						PenDown(sb, cfg);
 						down = true;
@@ -97,7 +102,7 @@ namespace LaserGRBL.Plotter
 				}
 			}
 
-			if (down)
+			if (down && !manual)
 				PenUp(sb, cfg);
 
 			sb.Append("(cut length mm ").Append(PlotGeom.Num(cutLength)).Append(")\r\n");
@@ -106,14 +111,17 @@ namespace LaserGRBL.Plotter
 
 		private static void Rapid(StringBuilder sb, PlotterConfig cfg, double x, double y)
 		{
-			if (cfg.TravelSpeed <= 0)
+			int feed = cfg.TravelSpeed;
+			if (cfg.PenMode == PlotterPenMode.Manual && feed <= 0)
+				feed = cfg.CutSpeed;
+			if (feed <= 0)
 			{
 				sb.Append("G0 X").Append(PlotGeom.Num(x)).Append(" Y").Append(PlotGeom.Num(y)).Append("\r\n");
 			}
 			else
 			{
 				sb.Append("G1 X").Append(PlotGeom.Num(x)).Append(" Y").Append(PlotGeom.Num(y));
-				sb.Append(" F").Append(cfg.TravelSpeed.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append("\r\n");
+				sb.Append(" F").Append(feed.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append("\r\n");
 			}
 		}
 
@@ -125,6 +133,8 @@ namespace LaserGRBL.Plotter
 
 		private static void PenUp(StringBuilder sb, PlotterConfig cfg)
 		{
+			if (cfg.PenMode == PlotterPenMode.Manual)
+				return;
 			if (cfg.PenMode == PlotterPenMode.ZAxis)
 				sb.Append("G0 Z").Append(PlotGeom.Num(cfg.PenUpZ)).Append("\r\n");
 			else if (cfg.PenMode == PlotterPenMode.Digital)
@@ -136,6 +146,8 @@ namespace LaserGRBL.Plotter
 
 		private static void PenDown(StringBuilder sb, PlotterConfig cfg)
 		{
+			if (cfg.PenMode == PlotterPenMode.Manual)
+				return;
 			if (cfg.PenMode == PlotterPenMode.ZAxis)
 			{
 				sb.Append("G1 Z").Append(PlotGeom.Num(cfg.PenDownZ));

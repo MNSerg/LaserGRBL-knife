@@ -7,13 +7,7 @@ LaserGRBL is a Windows GUI for [GRBL](https://github.com/gnea/grbl/wiki). Unlike
 
 This copy can drive a laser that was converted into a plotter with a passive swivel blade. Laser jobs are unchanged until plotter mode is turned on.
 
-Open **Grbl → Plotter...** (Плоттер...). Set the blade offset (distance from the swivel axis to the tip), overcut, lead-in, speeds, and how the knife is raised:
-
-- Servo on the laser PWM pin (`M3 S`, default S=0 up and S=255 down). Prefer GRBL `$32=0` so the PWM value is not cleared during G0.
-- Solenoid: `M3` down, `M5` up.
-- Z axis: `G0 Z` up, `G1 Z` down.
-
-With the mode enabled, SVG files and image vectorization / centerline are rebuilt for the knife: contours are simplified, inner shapes are cut before the outline, travel is shortened, and each corner becomes an arc of radius equal to the blade offset so the tip stays on the vertex while the blade turns. The preview shows the swivel-axis path (slightly outside the design); the tip follows the original line. Raster engraving is not used. Border speed in the import dialog is the cut speed.
+Open **Grbl → Plotter...** (Плоттер...). The machine this mode is set up for has no Z axis: blade height is set by hand before the job, and the program sends only X and Y. Default blade offset is 3.60 mm (editable), overcut and lead-in match it, cut speed starts at 600 mm/min (editable in the same dialog and in the import window), one pass. A move between separate contours also cuts, because the knife stays down. Hatch fill is not generated. Vectorize keeps outlines and holes; Centerline keeps stroke lines.
 
 **File → Apply plotter to loaded file** runs the same compensation on G-code that is already open. Do not run it twice on the same file.
 
@@ -27,7 +21,7 @@ The script compiles against .NET Framework 4.8 and writes `dist\LaserGRBL-Plotte
 
 The drag-knife math is covered by `LaserGRBL.Plotter.Tests` (`dotnet test`).
 
-Values assumed until measured on the machine: craft blade offset 0.50 mm, overcut 1.0 mm, lead-in 0.50 mm, cut 800 mm/min, corner arcs from 8°, knife lift only above 150°, servo S=0 up / S=255 down. Change them in the plotter dialog. Still worth confirming: the real lift method and its S or Z numbers, the measured tip offset, material and speed, whether the board has a working Z axis, the current `$32` value, and whether filled shapes should stay outline-only.
+Defaults match a 1 mm rubber sheet and a measured 3.60 mm blade offset. Change offset and cut speed in the plotter dialog; both are stored. `$32` is left to the machine. Servo, solenoid and Z lift remain in the dialog if a lift is added later.
 
 All downloads available at https://github.com/arkypita/LaserGRBL/releases
 

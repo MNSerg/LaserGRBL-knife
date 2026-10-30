@@ -10,7 +10,9 @@ namespace LaserGRBL.Plotter
 		/// <summary>Solenoid or relay: M3 down, M5 up.</summary>
 		Digital = 1,
 		/// <summary>Real Z axis: G0 Z up, G1 Z down.</summary>
-		ZAxis = 2
+		ZAxis = 2,
+		/// <summary>Knife height is set by hand. The program only moves X and Y, and the blade stays down.</summary>
+		Manual = 3
 	}
 
 	public enum PlotterBladePreset
@@ -19,7 +21,8 @@ namespace LaserGRBL.Plotter
 		Pen = 1,
 		VinylFine = 2,
 		Craft = 3,
-		Deep = 4
+		Deep = 4,
+		Rubber = 5
 	}
 
 	/// <summary>
@@ -58,21 +61,21 @@ namespace LaserGRBL.Plotter
 		{
 			PlotterConfig c = new PlotterConfig();
 			c.Enabled = false;
-			c.Preset = PlotterBladePreset.Craft;
-			c.BladeName = "Craft 0.50";
-			c.BladeOffsetMm = 0.50;
-			c.OvercutMm = 1.0;
-			c.LeadInMm = 0.50;
+			c.Preset = PlotterBladePreset.Rubber;
+			c.BladeName = "Rubber 3.60";
+			c.BladeOffsetMm = 3.6;
+			c.OvercutMm = 3.6;
+			c.LeadInMm = 3.6;
 			c.CornerThresholdDeg = 8;
-			c.LiftAngleDeg = 150;
+			c.LiftAngleDeg = 0;
 			c.SimplifyMm = 0.05;
 			c.MinSegmentMm = 0.02;
-			c.CutSpeed = 800;
+			c.CutSpeed = 600;
 			c.TravelSpeed = 0;
 			c.PlungeSpeed = 300;
-			c.DwellDownMs = 100;
-			c.DwellUpMs = 50;
-			c.PenMode = PlotterPenMode.ServoPwm;
+			c.DwellDownMs = 0;
+			c.DwellUpMs = 0;
+			c.PenMode = PlotterPenMode.Manual;
 			c.ServoUp = 0;
 			c.ServoDown = 255;
 			c.PenUpZ = 5;
@@ -115,6 +118,13 @@ namespace LaserGRBL.Plotter
 				BladeOffsetMm = 0.75;
 				OvercutMm = 1.20;
 				LeadInMm = 0.75;
+			}
+			else if (preset == PlotterBladePreset.Rubber)
+			{
+				BladeName = "Rubber 3.60";
+				BladeOffsetMm = 3.6;
+				OvercutMm = 3.6;
+				LeadInMm = 3.6;
 			}
 		}
 

@@ -151,9 +151,38 @@ M5";
 			Assert.Contains("paths 0", result);
 		}
 
+		[Fact]
+		public void Manual_height_emits_xy_only_at_cut_speed()
+		{
+			PlotterConfig cfg = PlotterConfig.CreateDefault();
+			Assert.Equal(PlotterPenMode.Manual, cfg.PenMode);
+			Assert.Equal(3.6, cfg.BladeOffsetMm, 5);
+			Assert.Equal(1, cfg.Passes);
+			cfg.SimplifyMm = 0;
+			cfg.MinSegmentMm = 0;
+			cfg.OptimizeOrder = false;
+			cfg.InsideFirst = false;
+			cfg.CutSpeed = 600;
+			cfg.TravelSpeed = 0;
+			cfg.LiftAngleDeg = 150;
+
+			string source = "G0 X0 Y0\nM3 S0\nS255\nG1 X10 Y0\nG1 X10 Y10\nG1 X0 Y10\nG1 X0 Y0\nS0\n";
+			string result = PlotterPipeline.Convert(source, cfg);
+
+			Assert.Contains("F600", result);
+			Assert.DoesNotContain("M3", result);
+			Assert.DoesNotContain("M5", result);
+			Assert.DoesNotContain("G0 ", result);
+			Assert.DoesNotContain(" Z", result);
+			Assert.Contains("G3", result);
+		}
+
 		private static PlotterConfig Knife()
 		{
 			PlotterConfig cfg = PlotterConfig.CreateDefault();
+			cfg.PenMode = PlotterPenMode.ServoPwm;
+			cfg.ServoUp = 0;
+			cfg.ServoDown = 255;
 			cfg.SimplifyMm = 0;
 			cfg.MinSegmentMm = 0;
 			cfg.OptimizeOrder = false;

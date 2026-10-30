@@ -84,6 +84,7 @@ namespace LaserGRBL.Plotter
 			table.SetColumnSpan(mEnabled, 2);
 
 			mPreset = AddCombo(table, Tr("Blade preset", "Пресет лезвия"));
+			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Rubber, Tr("Rubber blade 3.60 mm", "Резина, лезвие 3,60 мм")));
 			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Pen, Tr("Pen (no offset)", "Перо (без смещения)")));
 			mPreset.Items.Add(new PresetItem(PlotterBladePreset.VinylFine, Tr("Vinyl blade 0.25 mm", "Винил 0.25 мм")));
 			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Craft, Tr("Craft blade 0.50 mm", "Канцелярское 0.50 мм")));
@@ -102,15 +103,17 @@ namespace LaserGRBL.Plotter
 			mPasses = AddNum(table, Tr("Passes", "Проходы"), 1, 30, 0, 1);
 
 			mCutSpeed = AddNum(table, Tr("Cut speed, mm/min", "Скорость реза, мм/мин"), 1, 50000, 0, 50);
-			mTravel = AddNum(table, Tr("Travel speed, mm/min (0 = G0)", "Холостой ход, мм/мин (0 = G0)"), 0, 50000, 0, 50);
+			mTravel = AddNum(table, Tr("Travel speed, mm/min (0 = cut speed, no G0 while the knife stays down)", "Переезд, мм/мин (0 = скорость реза; нож не поднимается)"), 0, 50000, 0, 50);
 			mPlunge = AddNum(table, Tr("Plunge speed, mm/min", "Скорость опускания, мм/мин"), 1, 50000, 0, 50);
 			mDwellDown = AddNum(table, Tr("Dwell after down, ms", "Пауза после опускания, мс"), 0, 5000, 0, 10);
 			mDwellUp = AddNum(table, Tr("Dwell after up, ms", "Пауза после подъёма, мс"), 0, 5000, 0, 10);
 
 			mPen = AddCombo(table, Tr("Knife up / down", "Подъём / опускание ножа"));
+			mPen.Items.Add(new PenItem(PlotterPenMode.Manual, Tr("Manual height, XY only", "Высота вручную, только X и Y")));
 			mPen.Items.Add(new PenItem(PlotterPenMode.ServoPwm, Tr("Servo on laser PWM (M3 S)", "Серво на ШИМ лазера (M3 S)")));
 			mPen.Items.Add(new PenItem(PlotterPenMode.Digital, Tr("Solenoid M3 down / M5 up", "Соленоид M3 вниз / M5 вверх")));
 			mPen.Items.Add(new PenItem(PlotterPenMode.ZAxis, Tr("Z axis", "Ось Z")));
+			mPen.SelectedIndexChanged += PenModeChanged;
 
 			mServoUp = AddNum(table, Tr("S value, knife up", "Значение S, нож вверх"), 0, 100000, 0, 1);
 			mServoDown = AddNum(table, Tr("S value, knife down", "Значение S, нож вниз"), 0, 100000, 0, 1);
@@ -125,8 +128,8 @@ namespace LaserGRBL.Plotter
 			help.Height = 88;
 			help.Dock = DockStyle.Top;
 			help.Text = Tr(
-				"Offset is the distance from the swivel axis to the blade tip. The holder path is shifted forward by that distance, and corners become arcs so the tip stays put while the blade turns. Lead-in aligns the blade before the line; overcut closes a contour. For a servo on the laser pin, S up should be the raised angle (0 if PWM off lifts the knife) and GRBL $32=0 is the safe choice so power is not dropped on G0. Raster engraving is not used in this mode.",
-				"Смещение — расстояние от оси поворота до кончика лезвия. Траектория держателя сдвигается вперёд на эту величину, а на углах строится дуга: кончик стоит, лезвие поворачивается. Заход выравнивает лезвие до линии, перерез замыкает контур. Для сервопривода на выводе лазера S «вверх» — это поднятый угол (0, если выключенный ШИМ поднимает нож). Для GRBL лучше $32=0, чтобы мощность не сбрасывалась на G0. Растровая гравировка в этом режиме не используется.");
+				"This machine has no Z. Set the blade height by hand before the job (usually on the table, to cut 1 mm rubber through). The program moves only X and Y, so a move between shapes also cuts. Blade offset, overcut, lead-in and cut speed stay editable. One pass is the default. Hatch fill is not generated: outlines, holes and internal lines are cut. Use Vectorize for silhouettes and Centerline for stroke drawings.",
+				"Оси Z нет. Высоту ножа выставьте вручную до пуска (обычно в стол, чтобы прорезать резину 1 мм). Программа двигает только X и Y, поэтому переезд между контурами тоже режет. Смещение, перерез, заход и скорость реза можно менять. По умолчанию один проход. Штриховка не строится: режутся контур, отверстия и внутренние линии. Силуэты — «Векторизация», штриховой рисунок — «Центральная линия».");
 			table.Controls.Add(help, 0, table.RowCount);
 			table.SetColumnSpan(help, 2);
 			table.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
@@ -191,6 +194,26 @@ namespace LaserGRBL.Plotter
 			mInside.Checked = cfg.InsideFirst;
 			mLinearize.Checked = cfg.LinearizeArcs;
 			mLoading = false;
+			UpdatePenFields();
+		}
+
+		private void PenModeChanged(object sender, EventArgs e)
+		{
+			if (!mLoading)
+				UpdatePenFields();
+		}
+
+		private void UpdatePenFields()
+		{
+			bool manual = mPen.SelectedItem != null && ((PenItem)mPen.SelectedItem).Mode == PlotterPenMode.Manual;
+			mServoUp.Enabled = !manual;
+			mServoDown.Enabled = !manual;
+			mZUp.Enabled = !manual;
+			mZDown.Enabled = !manual;
+			mPlunge.Enabled = !manual;
+			mDwellDown.Enabled = !manual;
+			mDwellUp.Enabled = !manual;
+			mLift.Enabled = !manual;
 		}
 
 		private PlotterConfig ReadValues()

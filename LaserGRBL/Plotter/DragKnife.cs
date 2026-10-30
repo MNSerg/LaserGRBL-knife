@@ -93,7 +93,8 @@ namespace LaserGRBL.Plotter
 			PlotPoint from = Shift(corner, uIn, offset);
 			PlotPoint to = Shift(corner, uOut, offset);
 
-			if (cfg.LiftAngleDeg > 0 && deg >= cfg.LiftAngleDeg)
+			double liftAngle = cfg.PenMode == PlotterPenMode.Manual ? 0 : cfg.LiftAngleDeg;
+			if (liftAngle > 0 && deg >= liftAngle)
 			{
 				double align = lead > 0 ? lead : offset;
 				Travel(moves, Shift(corner, uOut, offset - align));

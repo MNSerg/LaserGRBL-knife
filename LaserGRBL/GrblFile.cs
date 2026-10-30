@@ -382,7 +382,7 @@ namespace LaserGRBL
 			List<List<Curve>> flist = null;
 
 
-			if (VectorFilling(c.dir))
+			if (VectorFilling(c.dir) && !PlotterSettings.IsEnabled)
 			{
 				flist = PotraceClipper.BuildFilling(plist, bmp.Width, bmp.Height, c);
 				flist = ParallelOptimizePaths(flist, 0 /*ComputeDirectionChangeCost(c, core, false)*/);
@@ -421,7 +421,7 @@ namespace LaserGRBL
 
 			if (PlotterSettings.IsEnabled)
 			{
-				EmitPlotterCurves(plist, flist, c);
+				EmitPlotterCurves(plist, null, c);
 				Analyze();
 				long plotterElapsed = Tools.HiResTimer.TotalMilliseconds - start;
 				RiseOnFileLoaded(filename, plotterElapsed);
