@@ -103,7 +103,10 @@ namespace LaserGRBL.SvgConverter
 
 		public void ShowDialogForm()
         {
-			IIBorderTracing.CurrentValue = Settings.GetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", 1000);
+			bool plotter = LaserGRBL.Plotter.PlotterSettings.Enabled;
+			IIBorderTracing.CurrentValue = plotter
+				? LaserGRBL.Plotter.PlotterSettings.CutSpeed
+				: Settings.GetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", 1000);
 
 			string LaserOn = Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.LaserOn", "M3");
 
@@ -120,6 +123,15 @@ namespace LaserGRBL.SvgConverter
 			IIMaxPower.CurrentValue = Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.PowerMax", (int)GrblCore.Configuration.MaxPWM);
 
 			IIBorderTracing.Visible = LblBorderTracing.Visible = LblBorderTracingmm.Visible = true;
+
+			// Hide laser power controls in plotter/knife mode
+			GbLaser.Visible = !plotter;
+			LblSmin.Visible = LblSmax.Visible = IIMaxPower.Visible = IIMinPower.Visible = BtnModulationInfo.Visible = supportPWM && !plotter;
+			if (plotter)
+			{
+				Text = "SVG → G-code (плоттер)";
+				LblBorderTracing.Text = "Скорость реза";
+			}
 
 			RefreshPerc();
 

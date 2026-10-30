@@ -1,4 +1,4 @@
-// Plotter / drag-knife settings UI (code-built, no Designer)
+// Plotter / drag-knife settings UI (Russian labels; code-built, no Designer)
 // Copyright (c) 2026 — fork extension under GPLv3
 
 using System;
@@ -10,6 +10,7 @@ namespace LaserGRBL.Plotter
 	public class PlotterSettingsForm : Form
 	{
 		CheckBox CbEnabled;
+		CheckBox CbContinuous;
 		NumericUpDown NudBladeOffset;
 		NumericUpDown NudSwivelAngle;
 		NumericUpDown NudCutSpeed;
@@ -25,22 +26,24 @@ namespace LaserGRBL.Plotter
 		CheckBox CbOptimize;
 		CheckBox CbInnerFirst;
 		CheckBox CbPauseDown;
+		Label LblTravel;
 		Label LblDownCmd;
 		Label LblUpCmd;
 		Label LblZDown;
 		Label LblZUp;
 		Label LblZFeed;
+		Label LblHelp;
 		Button BtnOk;
 		Button BtnCancel;
 
 		public PlotterSettingsForm()
 		{
-			Text = "Plotter / Knife mode";
+			Text = "Режим плоттера / ножа";
 			FormBorderStyle = FormBorderStyle.FixedDialog;
 			MaximizeBox = false;
 			MinimizeBox = false;
 			StartPosition = FormStartPosition.CenterParent;
-			ClientSize = new Size(440, 520);
+			ClientSize = new Size(520, 580);
 			Font = new Font("Segoe UI", 9f);
 
 			BackColor = ColorScheme.FormBackColor;
@@ -48,31 +51,31 @@ namespace LaserGRBL.Plotter
 
 			int y = 12;
 			int left = 16;
-			int labelW = 200;
-			int ctrlLeft = 220;
-			int ctrlW = 180;
+			int ctrlLeft = 280;
+			int ctrlW = 200;
 			int row = 28;
 
-			CbEnabled = AddCheck(left, ref y, "Enable plotter (knife) mode");
-			y += 6;
+			CbEnabled = AddCheck(left, ref y, "Включить режим плоттера (нож)");
+			CbContinuous = AddCheck(left, ref y, "Непрерывный рез (без подъёма; переезды тоже режут)");
+			y += 4;
 
-			AddLabel(left, y, "Blade offset / tip distance (mm)");
+			AddLabel(left, y, "Смещение лезвия от оси поворота (мм)");
 			NudBladeOffset = AddNud(ctrlLeft, y, ctrlW, 0, 20, 0.05m, 2);
 			y += row;
 
-			AddLabel(left, y, "Swivel arc threshold (deg)");
+			AddLabel(left, y, "Порог угла для дуги поворота (°)");
 			NudSwivelAngle = AddNud(ctrlLeft, y, ctrlW, 1, 180, 1, 0);
 			y += row;
 
-			AddLabel(left, y, "Cut speed (mm/min)");
+			AddLabel(left, y, "Скорость реза (мм/мин)");
 			NudCutSpeed = AddNud(ctrlLeft, y, ctrlW, 1, 30000, 10, 0);
 			y += row;
 
-			AddLabel(left, y, "Travel speed (mm/min)");
+			LblTravel = AddLabel(left, y, "Скорость холостого хода (мм/мин)");
 			NudTravelSpeed = AddNud(ctrlLeft, y, ctrlW, 1, 30000, 10, 0);
 			y += row + 4;
 
-			AddLabel(left, y, "Knife down / up method");
+			AddLabel(left, y, "Способ опускания / подъёма ножа");
 			CbDownMode = new ComboBox
 			{
 				Left = ctrlLeft,
@@ -82,62 +85,75 @@ namespace LaserGRBL.Plotter
 				BackColor = ColorScheme.FormBackColor,
 				ForeColor = ColorScheme.FormForeColor
 			};
-			CbDownMode.Items.Add("Spindle pin (M3/M5 or PWM)");
-			CbDownMode.Items.Add("Z axis");
-			CbDownMode.Items.Add("Custom G-code commands");
+			CbDownMode.Items.Add("Всегда вниз (высота вручную, без Z)");
+			CbDownMode.Items.Add("Пин шпинделя (M3/M5)");
+			CbDownMode.Items.Add("Ось Z");
+			CbDownMode.Items.Add("Свои G-code команды");
 			CbDownMode.SelectedIndexChanged += (s, e) => RefreshModeVisibility();
 			Controls.Add(CbDownMode);
 			y += row;
 
-			LblDownCmd = AddLabel(left, y, "Knife DOWN command");
+			LblDownCmd = AddLabel(left, y, "Команда ОПУСТИТЬ нож");
 			TbDownCmd = AddText(ctrlLeft, y, ctrlW);
 			y += row;
 
-			LblUpCmd = AddLabel(left, y, "Knife UP command");
+			LblUpCmd = AddLabel(left, y, "Команда ПОДНЯТЬ нож");
 			TbUpCmd = AddText(ctrlLeft, y, ctrlW);
 			y += row;
 
-			LblZDown = AddLabel(left, y, "Z down (cut) position");
+			LblZDown = AddLabel(left, y, "Z вниз (рез)");
 			NudZDown = AddNud(ctrlLeft, y, ctrlW, -100, 100, 0.1m, 2);
 			y += row;
 
-			LblZUp = AddLabel(left, y, "Z up (travel) position");
+			LblZUp = AddLabel(left, y, "Z вверх (переезд)");
 			NudZUp = AddNud(ctrlLeft, y, ctrlW, -100, 100, 0.1m, 2);
 			y += row;
 
-			LblZFeed = AddLabel(left, y, "Z feed (mm/min)");
+			LblZFeed = AddLabel(left, y, "Подача Z (мм/мин)");
 			NudZFeed = AddNud(ctrlLeft, y, ctrlW, 1, 10000, 10, 0);
 			y += row + 4;
 
-			AddLabel(left, y, "Lead-in (mm, 0=off)");
+			AddLabel(left, y, "Lead-in — разгон перед контуром (мм, 0=выкл)");
 			NudLeadIn = AddNud(ctrlLeft, y, ctrlW, 0, 50, 0.1m, 2);
 			y += row;
 
-			AddLabel(left, y, "Overcut (mm, 0=off)");
+			AddLabel(left, y, "Overcut — дорез угла (мм, 0=выкл)");
 			NudOvercut = AddNud(ctrlLeft, y, ctrlW, 0, 50, 0.1m, 2);
 			y += row + 4;
 
-			CbOptimize = AddCheck(left, ref y, "Optimize path order (nearest-neighbour)");
-			CbInnerFirst = AddCheck(left, ref y, "Cut inner contours before outer");
-			CbPauseDown = AddCheck(left, ref y, "Pause (M0) before each knife-down");
+			CbOptimize = AddCheck(left, ref y, "Оптимизация порядка (ближайший сосед; может нарушить «сначала внешние»)");
+			CbInnerFirst = AddCheck(left, ref y, "Сначала внутренние контуры (для сквозного реза обычно выкл.)");
+			CbPauseDown = AddCheck(left, ref y, "Пауза M0 перед опусканием ножа (выборочно)");
+
+			LblHelp = new Label
+			{
+				Left = left,
+				Top = y + 4,
+				Width = ClientSize.Width - 32,
+				Height = 48,
+				ForeColor = ColorScheme.FormForeColor,
+				Text = "Подсказка: kiss-cut = надрез верхнего слоя (винил); сквозной рез = насквозь. " +
+				       "Lead-in выравнивает лезвие до контура; overcut добивает угол на замкнутом пути."
+			};
+			Controls.Add(LblHelp);
 
 			BtnOk = new Button
 			{
-				Text = "Save",
+				Text = "Сохранить",
 				DialogResult = DialogResult.OK,
-				Left = ClientSize.Width - 180,
+				Left = ClientSize.Width - 200,
 				Top = ClientSize.Height - 40,
-				Width = 75,
+				Width = 90,
 				BackColor = ColorScheme.FormButtonsColor,
 				ForeColor = ColorScheme.FormForeColor
 			};
 			BtnCancel = new Button
 			{
-				Text = "Cancel",
+				Text = "Отмена",
 				DialogResult = DialogResult.Cancel,
-				Left = ClientSize.Width - 95,
+				Left = ClientSize.Width - 100,
 				Top = ClientSize.Height - 40,
-				Width = 75,
+				Width = 85,
 				BackColor = ColorScheme.FormButtonsColor,
 				ForeColor = ColorScheme.FormForeColor
 			};
@@ -145,6 +161,8 @@ namespace LaserGRBL.Plotter
 			Controls.Add(BtnCancel);
 			AcceptButton = BtnOk;
 			CancelButton = BtnCancel;
+
+			CbContinuous.CheckedChanged += (s, e) => RefreshModeVisibility();
 
 			LoadFromSettings();
 			RefreshModeVisibility();
@@ -172,6 +190,7 @@ namespace LaserGRBL.Plotter
 				Left = x,
 				Top = y,
 				AutoSize = true,
+				MaximumSize = new Size(ClientSize.Width - 32, 0),
 				ForeColor = ColorScheme.FormForeColor
 			};
 			Controls.Add(c);
@@ -214,11 +233,12 @@ namespace LaserGRBL.Plotter
 		void LoadFromSettings()
 		{
 			CbEnabled.Checked = PlotterSettings.Enabled;
+			CbContinuous.Checked = PlotterSettings.ContinuousCut;
 			NudBladeOffset.Value = Clamp(NudBladeOffset, (decimal)PlotterSettings.BladeOffsetMm);
 			NudSwivelAngle.Value = Clamp(NudSwivelAngle, (decimal)PlotterSettings.SwivelAngleDeg);
 			NudCutSpeed.Value = Clamp(NudCutSpeed, PlotterSettings.CutSpeed);
 			NudTravelSpeed.Value = Clamp(NudTravelSpeed, PlotterSettings.TravelSpeed);
-			CbDownMode.SelectedIndex = Math.Min((int)PlotterSettings.DownMode, CbDownMode.Items.Count - 1);
+			CbDownMode.SelectedIndex = Math.Min(Math.Max((int)PlotterSettings.DownMode, 0), CbDownMode.Items.Count - 1);
 			TbDownCmd.Text = PlotterSettings.KnifeDownCommand;
 			TbUpCmd.Text = PlotterSettings.KnifeUpCommand;
 			NudZDown.Value = Clamp(NudZDown, (decimal)PlotterSettings.ZDown);
@@ -240,20 +260,25 @@ namespace LaserGRBL.Plotter
 
 		void RefreshModeVisibility()
 		{
-			bool spindle = CbDownMode.SelectedIndex == 0;
-			bool z = CbDownMode.SelectedIndex == 1;
-			bool custom = CbDownMode.SelectedIndex == 2;
+			bool always = CbDownMode.SelectedIndex == 0;
+			bool spindle = CbDownMode.SelectedIndex == 1;
+			bool z = CbDownMode.SelectedIndex == 2;
+			bool custom = CbDownMode.SelectedIndex == 3;
+			bool continuous = CbContinuous.Checked;
 
 			LblDownCmd.Visible = TbDownCmd.Visible = spindle || custom;
 			LblUpCmd.Visible = TbUpCmd.Visible = spindle || custom;
 			LblZDown.Visible = NudZDown.Visible = z;
 			LblZUp.Visible = NudZUp.Visible = z;
 			LblZFeed.Visible = NudZFeed.Visible = z;
+			LblTravel.Visible = NudTravelSpeed.Visible = !continuous;
+			CbPauseDown.Enabled = !always;
 		}
 
 		void SaveToSettings()
 		{
 			PlotterSettings.Enabled = CbEnabled.Checked;
+			PlotterSettings.ContinuousCut = CbContinuous.Checked;
 			PlotterSettings.BladeOffsetMm = (float)NudBladeOffset.Value;
 			PlotterSettings.SwivelAngleDeg = (float)NudSwivelAngle.Value;
 			PlotterSettings.CutSpeed = (int)NudCutSpeed.Value;
@@ -270,7 +295,6 @@ namespace LaserGRBL.Plotter
 			PlotterSettings.CutInnerFirst = CbInnerFirst.Checked;
 			PlotterSettings.PauseOnKnifeDown = CbPauseDown.Checked;
 
-			// Keep existing laser speed keys in sync so converters pick cut speed without more plumbing
 			if (CbEnabled.Checked)
 			{
 				Settings.SetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", PlotterSettings.CutSpeed);

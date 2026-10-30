@@ -598,7 +598,7 @@ namespace LaserGRBL
 				FormTitle = FormTitle + $" (for {Core.Type})";
 
 			if (LaserGRBL.Plotter.PlotterSettings.Enabled)
-				FormTitle = FormTitle + " [Plotter]";
+				FormTitle = FormTitle + " [Плоттер]";
 
 			if (Text != FormTitle) Text = FormTitle;
 		}
@@ -771,7 +771,7 @@ namespace LaserGRBL
 		private void MnPlotterSettings_Click(object sender, EventArgs e)
 		{
 			LaserGRBL.Plotter.PlotterSettingsForm.CreateAndShowDialog(this);
-			UpdatePlotterModeIndicator();
+			ApplyPlotterUiMode();
 		}
 
 		private void EnsurePlotterMenuItem()
@@ -781,7 +781,7 @@ namespace LaserGRBL
 				if (it.Name == "MnPlotterSettings")
 					return;
 
-			ToolStripMenuItem mn = new ToolStripMenuItem("Plotter / Knife settings...");
+			ToolStripMenuItem mn = new ToolStripMenuItem("Плоттер / настройки ножа...");
 			mn.Name = "MnPlotterSettings";
 			mn.Click += MnPlotterSettings_Click;
 			int idx = MnGrbl.DropDownItems.IndexOf(settingsToolStripMenuItem);
@@ -791,11 +791,22 @@ namespace LaserGRBL
 				MnGrbl.DropDownItems.Add(mn);
 
 			IconsMgr.PrepareMenuItem(mn, "mdi-content-cut");
-			UpdatePlotterModeIndicator();
+			ApplyPlotterUiMode();
 		}
 
-		private void UpdatePlotterModeIndicator()
+		private void ApplyPlotterUiMode()
 		{
+			bool plotter = LaserGRBL.Plotter.PlotterSettings.Enabled;
+			// Hide laser-centric tools while plotter mode is on
+			try
+			{
+				MnPowerVsSpeed.Visible = !plotter;
+				MnCuttingTest.Visible = !plotter;
+				MnMaterialDB.Visible = !plotter;
+				laserUsageStatsToolStripMenuItem.Visible = !plotter;
+				shakeTestToolStripMenuItem.Visible = !plotter;
+			}
+			catch { /* designer items may differ across locales */ }
 			RefreshFormTitle();
 		}
 

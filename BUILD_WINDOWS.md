@@ -26,11 +26,17 @@ nuget restore LaserGRBL.sln
 msbuild LaserGRBL.sln /p:Configuration=Release /p:Platform="Any CPU"
 ```
 
-## Установщик (опционально)
+## Установщик
 
-`setup.iss` — скрипт [Inno Setup](https://jrsoftware.org/isinfo.php). После Release-сборки скомпилируйте его на Windows, чтобы получить `install.exe`.
+- `setup-knife.iss` — установщик форка **LaserGRBL-knife** (отдельный AppId, русский язык, ассоциация `.dxf`)
+- Оригинальный `setup.iss` оставлен для совместимости
 
-Для форка рекомендуется сменить `AppId` / имя в `setup.iss`, чтобы не конфликтовать с оригинальным LaserGRBL.
+CI собирает `LaserGRBL-knife-setup.exe` через Inno Setup 6 (Chocolatey). Локально:
+
+```bat
+msbuild LaserGRBL.sln /p:Configuration=Release /p:Platform="Any CPU"
+"%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" setup-knife.iss
+```
 
 ## Режим плоттера
 

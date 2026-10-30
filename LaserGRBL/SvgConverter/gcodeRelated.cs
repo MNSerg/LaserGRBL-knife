@@ -62,13 +62,15 @@ namespace LaserGRBL.SvgConverter
 
 		// Plotter / knife actuation (active when PlotterSettings.Enabled)
 		private static bool plotterMode = false;
-		private static PlotterSettings.KnifeActuation knifeActuation = PlotterSettings.KnifeActuation.SpindleToggle;
+		private static bool continuousCut = false;
+		private static PlotterSettings.KnifeActuation knifeActuation = PlotterSettings.KnifeActuation.AlwaysDown;
 		private static float gcodeZDown = -1f;
 		private static float gcodeZUp = 5f;
 		private static float gcodeZFeed = 500f;
 		private static string knifeCustomDown = "M3";
 		private static string knifeCustomUp = "M5";
 		private static bool pauseOnKnifeDown = false;
+		private static bool continuousFirstApproach = true;
 
 		public static void setup(GrblCore core)
 		{
@@ -77,6 +79,7 @@ namespace LaserGRBL.SvgConverter
 			setDecimalPlaces(mDecimalPlaces);
 
 			plotterMode = PlotterSettings.Enabled;
+			continuousCut = PlotterSettings.UseContinuousCut;
 			if (plotterMode)
 			{
 				gcodeXYFeed = PlotterSettings.CutSpeed;
@@ -96,6 +99,7 @@ namespace LaserGRBL.SvgConverter
 			else
 			{
 				gcodeDragCompensation = false;
+				continuousCut = false;
 				gcodeXYFeed = Settings.GetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", 1000);
 			}
 			
@@ -109,9 +113,11 @@ namespace LaserGRBL.SvgConverter
 			if (firmwareType == Firmware.Smoothie)
 				gcodeSpindleSpeed /= 255.0f;
 			gcodeSpindleCmdOn = plotterMode && knifeActuation != PlotterSettings.KnifeActuation.ZAxis
+				&& knifeActuation != PlotterSettings.KnifeActuation.AlwaysDown
 				? knifeCustomDown
 				: Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.LaserOn", "M3");
 			gcodeSpindleCmdOff = plotterMode && knifeActuation != PlotterSettings.KnifeActuation.ZAxis
+				&& knifeActuation != PlotterSettings.KnifeActuation.AlwaysDown
 				? knifeCustomUp
 				: Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.LaserOff", "M5");
 			if (!plotterMode)
@@ -119,6 +125,7 @@ namespace LaserGRBL.SvgConverter
 
 			lastMovewasG0 = true;
 			lastx = -1; lasty = -1; lastz = 0; lasts = -1 ; lastg = -1;
+			continuousFirstApproach = true;
 		}
 
 		public static bool reduceGCode
@@ -230,12 +237,17 @@ namespace LaserGRBL.SvgConverter
 		public static void PenDown(StringBuilder gcodeString, string cmto = "")
 		{
 			string cmt = cmto;
-			drag1stMove = true;
+			// Continuous cut: keep drag-knife orientation across path joins
+			if (!(plotterMode && continuousCut))
+				drag1stMove = true;
 			origFinalX = lastx;
 			origFinalY = lasty;
 			if (cmt.Length > 0) { cmt = string.Format("({0})", cmt); }
 
 			applyXYFeedRate = true;     // apply XY Feed Rate after each PenDown command (not just after Z-axis)
+
+			if (plotterMode && knifeActuation == PlotterSettings.KnifeActuation.AlwaysDown)
+				return; // height is set manually; no spindle/Z command
 
 			if (plotterMode && pauseOnKnifeDown)
 				gcodeString.Append("M0 (Pause before knife down)\r\n");
@@ -261,10 +273,18 @@ namespace LaserGRBL.SvgConverter
 		public static void PenUp(StringBuilder gcodeString, string cmto = "")
 		{
 			string cmt = cmto;
-			drag1stMove = true;
 			origFinalX = lastx;
 			origFinalY = lasty;
 			if (cmt.Length > 0) { cmt = string.Format("({0})", cmt); }
+
+			// Continuous through-cut: do not lift; keep blade engaged between contours
+			if (plotterMode && continuousCut)
+				return;
+
+			if (plotterMode && knifeActuation == PlotterSettings.KnifeActuation.AlwaysDown)
+				return;
+
+			drag1stMove = true;
 
 			if (plotterMode && knifeActuation == PlotterSettings.KnifeActuation.ZAxis)
 			{
@@ -310,11 +330,23 @@ namespace LaserGRBL.SvgConverter
 		{ MoveSplit(gcodeString, 1, x, y, z, applyXYFeedRate, cmt); }
 		public static void MoveToRapid(StringBuilder gcodeString, Point coord, string cmt = "")
 		{
-			Move(gcodeString, rapidnum, (float)coord.X, (float)coord.Y, false, cmt); lastMovewasG0 = true; 
+			MoveToRapid(gcodeString, (float)coord.X, (float)coord.Y, cmt);
 		}
 		public static void MoveToRapid(StringBuilder gcodeString, float x, float y, string cmt = "")
-		{ 
-			Move(gcodeString, rapidnum, x, y, false, cmt); lastMovewasG0 = true;
+		{
+			// Continuous knife: first approach is still G0 (get over start without cutting from unknown pose),
+			// later contour joins stay G1 so the blade remains engaged in the material.
+			if (plotterMode && continuousCut && !continuousFirstApproach)
+			{
+				MoveSplit(gcodeString, 1, x, y, true,
+					string.IsNullOrEmpty(cmt) ? "cut travel" : cmt);
+				lastMovewasG0 = false;
+				return;
+			}
+			Move(gcodeString, rapidnum, x, y, false, cmt);
+			lastMovewasG0 = true;
+			if (plotterMode && continuousCut)
+				continuousFirstApproach = false;
 		}
 
 		// MoveSplit breaks down a line to line segments with given max. length

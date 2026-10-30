@@ -7,7 +7,8 @@ namespace LaserGRBL.Plotter
 {
 	/// <summary>
 	/// Typed accessors for knife/plotter settings stored in LaserGRBL Settings.bin.
-	/// When Enabled, vector/SVG conversion uses drag-knife compensation and knife-oriented defaults.
+	/// Machine profile (from owner): passive swivel blade, no Z, height set manually,
+	/// continuous cut (travel between contours is also a cut), outer contours first.
 	/// </summary>
 	public static class PlotterSettings
 	{
@@ -27,15 +28,18 @@ namespace LaserGRBL.Plotter
 		public const string KeyOptimizeOrder = "Plotter.OptimizePathOrder";
 		public const string KeyInnerFirst = "Plotter.CutInnerFirst";
 		public const string KeyPauseOnKnifeDown = "Plotter.PauseOnKnifeDown";
+		public const string KeyContinuousCut = "Plotter.ContinuousCut";
 
 		public enum KnifeActuation
 		{
-			/// <summary>Reuse laser M3/M5 (or PWM S) as knife down/up — typical for solenoid/servo on spindle pin.</summary>
-			SpindleToggle = 0,
-			/// <summary>Move Z axis for knife down/up.</summary>
-			ZAxis = 1,
+			/// <summary>No up/down commands — blade height is set manually; stays engaged the whole job.</summary>
+			AlwaysDown = 0,
+			/// <summary>Reuse laser M3/M5 as knife down/up (solenoid/servo on spindle pin).</summary>
+			SpindleToggle = 1,
+			/// <summary>Move Z axis for knife down/up (not used on machines without Z).</summary>
+			ZAxis = 2,
 			/// <summary>Emit custom G-code lines for down/up.</summary>
-			CustomCommands = 2
+			CustomCommands = 3
 		}
 
 		public static bool Enabled
@@ -44,7 +48,7 @@ namespace LaserGRBL.Plotter
 			set { Settings.SetObject(KeyEnabled, value); }
 		}
 
-		/// <summary>Distance from swivel pivot to blade tip (mm). Typical craft blades: 0.25–1.0 mm.</summary>
+		/// <summary>Distance from swivel pivot to blade tip (mm).</summary>
 		public static float BladeOffsetMm
 		{
 			get { return Settings.GetObject(KeyBladeOffset, 0.5f); }
@@ -60,10 +64,11 @@ namespace LaserGRBL.Plotter
 
 		public static int CutSpeed
 		{
-			get { return Settings.GetObject(KeyCutSpeed, 1000); }
+			get { return Settings.GetObject(KeyCutSpeed, 800); }
 			set { Settings.SetObject(KeyCutSpeed, value); }
 		}
 
+		/// <summary>Used only when ContinuousCut is false (lifted travel).</summary>
 		public static int TravelSpeed
 		{
 			get { return Settings.GetObject(KeyTravelSpeed, 3000); }
@@ -72,7 +77,7 @@ namespace LaserGRBL.Plotter
 
 		public static KnifeActuation DownMode
 		{
-			get { return (KnifeActuation)Settings.GetObject(KeyKnifeDownMode, (int)KnifeActuation.SpindleToggle); }
+			get { return (KnifeActuation)Settings.GetObject(KeyKnifeDownMode, (int)KnifeActuation.AlwaysDown); }
 			set { Settings.SetObject(KeyKnifeDownMode, (int)value); }
 		}
 
@@ -106,29 +111,31 @@ namespace LaserGRBL.Plotter
 			set { Settings.SetObject(KeyZFeed, value); }
 		}
 
-		/// <summary>Optional lead-in distance before a path start (mm). 0 = disabled.</summary>
+		/// <summary>Optional lead-in before path start (mm). 0 = off. Extends the approach so the blade aligns before the real contour.</summary>
 		public static float LeadInMm
 		{
 			get { return Settings.GetObject(KeyLeadInMm, 0f); }
 			set { Settings.SetObject(KeyLeadInMm, value); }
 		}
 
-		/// <summary>Optional overcut past closed-path end (mm). 0 = disabled.</summary>
+		/// <summary>Optional overcut past closed-path end (mm). 0 = off. Helps complete corners with a swivel blade.</summary>
 		public static float OvercutMm
 		{
 			get { return Settings.GetObject(KeyOvercutMm, 0f); }
 			set { Settings.SetObject(KeyOvercutMm, value); }
 		}
 
+		/// <summary>Nearest-neighbour reordering. Off by default so Potrace outer-then-inner order is kept.</summary>
 		public static bool OptimizePathOrder
 		{
-			get { return Settings.GetObject(KeyOptimizeOrder, true); }
+			get { return Settings.GetObject(KeyOptimizeOrder, false); }
 			set { Settings.SetObject(KeyOptimizeOrder, value); }
 		}
 
+		/// <summary>False = outer contours first (recommended for continuous through-cut).</summary>
 		public static bool CutInnerFirst
 		{
-			get { return Settings.GetObject(KeyInnerFirst, true); }
+			get { return Settings.GetObject(KeyInnerFirst, false); }
 			set { Settings.SetObject(KeyInnerFirst, value); }
 		}
 
@@ -138,10 +145,25 @@ namespace LaserGRBL.Plotter
 			set { Settings.SetObject(KeyPauseOnKnifeDown, value); }
 		}
 
-		/// <summary>True when drag-knife geometry compensation should run during G-code moves.</summary>
+		/// <summary>
+		/// When true (default): no knife-up between paths; moves to the next contour are G1 at cut speed
+		/// so the blade stays in the material (owner machine has no Z lift).
+		/// </summary>
+		public static bool ContinuousCut
+		{
+			get { return Settings.GetObject(KeyContinuousCut, true); }
+			set { Settings.SetObject(KeyContinuousCut, value); }
+		}
+
 		public static bool UseDragCompensation
 		{
 			get { return Enabled && BladeOffsetMm > 0.001f; }
+		}
+
+		/// <summary>True when travel between paths must stay cutting (G1, no pen-up).</summary>
+		public static bool UseContinuousCut
+		{
+			get { return Enabled && ContinuousCut; }
 		}
 	}
 }

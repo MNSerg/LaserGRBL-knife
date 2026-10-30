@@ -125,21 +125,43 @@ namespace CsPotrace
 			}
 		}
 
+		private static bool plotterFirstApproach = true;
+
+		/// <summary>Call before exporting a new job so the first contour still uses G0.</summary>
+		public static void ResetPlotterApproach()
+		{
+			plotterFirstApproach = true;
+		}
+
 		private static void OnPathBegin(List<CsPotrace.Curve> Curves, string lOn, double oX, double oY, double scale, List<string> rv, string skipcmd)
 		{
 			if (Curves.Count > 0)
 			{
-				//fast go to position
-				rv.Add(String.Format("{0} X{1} Y{2}", skipcmd, formatnumber(Curves[0].A.X + oX, scale), formatnumber(Curves[0].A.Y + oY, scale)));
-				//turn on laser
-				rv.Add(lOn);
+				bool continuous = LaserGRBL.Plotter.PlotterSettings.UseContinuousCut;
+				string move;
+				if (continuous)
+				{
+					move = plotterFirstApproach ? "G0" : "G1";
+					plotterFirstApproach = false;
+				}
+				else
+					move = skipcmd;
+				// go to path start (G0 first, then G1 cut-travel between contours)
+				rv.Add(String.Format("{0} X{1} Y{2}", move, formatnumber(Curves[0].A.X + oX, scale), formatnumber(Curves[0].A.Y + oY, scale)));
+				// turn on laser / knife — skipped when always-down continuous cut
+				if (!string.IsNullOrEmpty(lOn) && !(continuous && LaserGRBL.Plotter.PlotterSettings.DownMode == LaserGRBL.Plotter.PlotterSettings.KnifeActuation.AlwaysDown))
+					rv.Add(lOn);
 			}
 		}
 
 		private static void OnPathEnd(List<CsPotrace.Curve> Curves, string lOff, double oX, double oY, double scale, List<string> rv)
 		{
-			//turn off laser
-			if (Curves.Count > 0)
+			if (Curves.Count == 0)
+				return;
+			// continuous through-cut: keep blade engaged between contours
+			if (LaserGRBL.Plotter.PlotterSettings.UseContinuousCut)
+				return;
+			if (!string.IsNullOrEmpty(lOff))
 				rv.Add(lOff);
 		}
 

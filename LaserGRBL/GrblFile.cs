@@ -191,6 +191,35 @@ namespace LaserGRBL
             });
         }
 
+		public void LoadImportedDXF(string filename, bool append, GrblCore core)
+		{
+			SafeLoadFile(() =>
+			{
+				RiseOnFileLoading(filename);
+				long start = Tools.HiResTimer.TotalMilliseconds;
+				if (!append)
+					ClearList();
+				mRange.ResetRange();
+
+				string gcode = LaserGRBL.Plotter.DxfImporter.ConvertFileToGCode(filename, core);
+				string[] lines = gcode.Split(Environment.NewLine.ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+				foreach (string l in lines)
+				{
+					string line = l;
+					if ((line = line.Trim()).Length > 0)
+					{
+						GrblCommand cmd = new GrblCommand(line);
+						if (!cmd.IsEmpty)
+							list.Add(cmd);
+					}
+				}
+
+				Analyze();
+				long elapsed = Tools.HiResTimer.TotalMilliseconds - start;
+				RiseOnFileLoaded(filename, elapsed);
+			});
+		}
+
 
 		private abstract class ColorSegment
 		{
@@ -418,23 +447,31 @@ namespace LaserGRBL
 			}
 
 			bool supportPWM = Settings.GetObject("Support Hardware PWM", true);
+			bool plotterMode = LaserGRBL.Plotter.PlotterSettings.Enabled;
+			bool plotterAlwaysDown = plotterMode
+				&& LaserGRBL.Plotter.PlotterSettings.DownMode == LaserGRBL.Plotter.PlotterSettings.KnifeActuation.AlwaysDown;
 
-
-			if (supportPWM)
-				list.Add(new GrblCommand($"{c.lOn} S0"));   //laser on and power to 0
-			else
-				list.Add(new GrblCommand($"{c.lOff} S{GrblCore.Configuration.MaxPWM}"));   //laser off and power to maxPower
+			if (!plotterAlwaysDown)
+			{
+				if (supportPWM)
+					list.Add(new GrblCommand($"{c.lOn} S0"));   //laser on and power to 0
+				else
+					list.Add(new GrblCommand($"{c.lOff} S{GrblCore.Configuration.MaxPWM}"));   //laser off and power to maxPower
+			}
 
 			//trace raster filling
 			if (flist != null)
 			{
 				List<string> gc = new List<string>();
-				if (supportPWM)
+				Potrace.ResetPlotterApproach();
+				if (plotterAlwaysDown)
+					gc.AddRange(Potrace.Export2GCode(flist, c.oX, c.oY, c.res, "", "", bmp.Size, skipcmd));
+				else if (supportPWM)
 					gc.AddRange(Potrace.Export2GCode(flist, c.oX, c.oY, c.res, $"S{c.maxPower}", "S0", bmp.Size, skipcmd));
 				else
 					gc.AddRange(Potrace.Export2GCode(flist, c.oX, c.oY, c.res, c.lOn, c.lOff, bmp.Size, skipcmd));
 
-				list.Add(new GrblCommand(String.Format("F{0}", c.markSpeed)));
+				list.Add(new GrblCommand(String.Format("F{0}", plotterMode ? LaserGRBL.Plotter.PlotterSettings.CutSpeed : c.markSpeed)));
 				foreach (string code in gc)
 					list.Add(new GrblCommand(code));
 			}
@@ -443,10 +480,11 @@ namespace LaserGRBL
 			//trace borders
 			if (plist != null) //always true
 			{
-				// Plotter/knife: always prefer inner-first + travel optimization when enabled
-				bool plotter = LaserGRBL.Plotter.PlotterSettings.Enabled;
-				bool forceOptimize = plotter && LaserGRBL.Plotter.PlotterSettings.OptimizePathOrder;
-				bool innerFirst = !plotter || LaserGRBL.Plotter.PlotterSettings.CutInnerFirst;
+				// Plotter/knife continuous through-cut: keep Potrace outer-then-inner order by default
+				bool forceOptimize = plotterMode && LaserGRBL.Plotter.PlotterSettings.OptimizePathOrder;
+				bool innerFirst = plotterMode
+					? LaserGRBL.Plotter.PlotterSettings.CutInnerFirst
+					: true; // classic laser vectorize: reverse to cut holes before outer
 
 				//Optimize fast movement
 				if (useOptimizeFast || forceOptimize)
@@ -454,17 +492,22 @@ namespace LaserGRBL
 				else if (innerFirst)
 					plist.Reverse(); //la lista viene fornita da potrace con prima esterni e poi interni, ma per il taglio è meglio il contrario
 				else
-				{ /* keep Potrace order: outer then inner */ }
+				{ /* keep Potrace order: outer then inner (plotter continuous cut) */ }
 
 				List<string> gc = new List<string>();
-				if (supportPWM)
+				// Keep approach state if filling already moved; otherwise reset for borders-only jobs
+				if (flist == null)
+					Potrace.ResetPlotterApproach();
+				if (plotterAlwaysDown)
+					gc.AddRange(Potrace.Export2GCode(plist, c.oX, c.oY, c.res, "", "", bmp.Size, skipcmd));
+				else if (supportPWM)
 					gc.AddRange(Potrace.Export2GCode(plist, c.oX, c.oY, c.res, $"S{c.maxPower}", "S0", bmp.Size, skipcmd));
 				else
 					gc.AddRange(Potrace.Export2GCode(plist, c.oX, c.oY, c.res, c.lOn, c.lOff, bmp.Size, skipcmd));
 
 				// For marlin, need to specify G1 each time :
 				//list.Add(new GrblCommand(String.Format("G1 F{0}", c.borderSpeed)));
-				list.Add(new GrblCommand(String.Format("F{0}", c.borderSpeed)));
+				list.Add(new GrblCommand(String.Format("F{0}", plotterMode ? LaserGRBL.Plotter.PlotterSettings.CutSpeed : c.borderSpeed)));
 				foreach (string code in gc)
 					list.Add(new GrblCommand(code));
 			}
