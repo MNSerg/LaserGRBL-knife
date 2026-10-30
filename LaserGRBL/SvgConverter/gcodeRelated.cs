@@ -511,27 +511,33 @@ namespace LaserGRBL.SvgConverter
 				gcnr = 3;
 			dragArc = (Math.Abs(angle[2]) > gcodeDragAngle);
 
-			// draw arc before move
-			if (dragArc)        // add arc to connect next move
+			// Soft turns (already filleted / gentle arcs): follow geometry as-is.
+			// Extending EVERY segment by blade offset was destroying small corner fillets.
+			if (!dragArc || drag1stMove)
 			{
-				origLastX = lastx; origLastY = lasty;
-				if ((angle[2] != 0) && !drag1stMove)
-				{
-					MoveArc(gcodeString, gcnr, rx, ry, dragCompi, dragCompj, applyXYFeedRate, "Drag t. comp.");// + angle[2].ToString());
-				}
-				lastx = origLastX; lasty = origLastY;
+				origFinalX = finalx;
+				origFinalY = finaly;
+				drag1stMove = false;
+				dragCompi = 0;
+				dragCompj = 0;
+				return new Point(finalx, finaly);
 			}
-			else
-			{               // connect first extend move with end of next extend move
+
+			// Sharp remaining corner: swivel arc + lead past the vertex by blade offset
+			origLastX = lastx; origLastY = lasty;
+			if (angle[2] != 0)
+			{
+				MoveArc(gcodeString, gcnr, rx, ry, dragCompi, dragCompj, applyXYFeedRate, "Drag t. comp.");
 			}
-			// calc end-pos with added offset and center of new arc
+			lastx = origLastX; lasty = origLastY;
+
 			origLastX = lastx;
 			origLastY = lasty;
 			origFinalX = finalx;
 			origFinalY = finaly;
-			finalx = finalx + gcodeDragRadius * dx / moveLength;    // set new finalx for move command
+			finalx = finalx + gcodeDragRadius * dx / moveLength;
 			finaly = finaly + gcodeDragRadius * dy / moveLength;
-			dragCompi = origFinalX - finalx;                              // calc center of arc to connect to next move
+			dragCompi = origFinalX - finalx;
 			dragCompj = origFinalY - finaly;
 
 			drag1stMove = false;

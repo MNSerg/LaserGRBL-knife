@@ -103,14 +103,18 @@ namespace LaserGRBL.Plotter
 
 			// Sharp corners → fillet to MinCornerRadius; smooth arcs (R >= min) stay as-is.
 			// Then drag-knife compensation (BladeOffset) runs inside gcode.MoveTo.
+			int ptsBefore = 0;
+			foreach (PlotterPath p in usable) ptsBefore += p.Points.Count;
+
 			float filletR = PlotterSettings.MinCornerRadiusMm;
 			if (filletR > 0.05f)
-			{
 				PathFillet.ApplyToAll(usable, filletR);
-				sb.AppendFormat(CultureInfo.InvariantCulture,
-					"(corner fillet R>={0:0.###} mm; blade offset {1:0.###} mm)\r\n",
-					filletR, PlotterSettings.BladeOffsetMm);
-			}
+
+			int ptsAfter = 0;
+			foreach (PlotterPath p in usable) ptsAfter += p.Points.Count;
+			sb.AppendFormat(CultureInfo.InvariantCulture,
+				"(plotter paths={0}; points {1}->{2}; fillet R={3:0.###}; offset={4:0.###}; swivel>={5:0.#}deg)\r\n",
+				usable.Count, ptsBefore, ptsAfter, filletR, PlotterSettings.BladeOffsetMm, PlotterSettings.SwivelAngleDeg);
 
 			// Prefer larger closed contours first (outer before holes, approx by length)
 			if (!PlotterSettings.CutInnerFirst)

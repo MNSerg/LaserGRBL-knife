@@ -442,6 +442,7 @@
     <Compile Include="Plotter\DxfImporter.cs" />
     <Compile Include="Plotter\PlotterPath.cs" />
     <Compile Include="Plotter\PathFillet.cs" />
+    <Compile Include="Plotter\PotraceToPlotter.cs" />
     <Compile Include="Plotter\PathOptimizerNotes.cs" />
     <Compile Include="Telegram.cs" />
     <Compile Include="Tools\DataProtector.cs" />
