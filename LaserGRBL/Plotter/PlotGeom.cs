@@ -179,6 +179,62 @@ namespace LaserGRBL.Plotter
 			return new PlotPoint((a.X + b.X) * 0.5, (a.Y + b.Y) * 0.5);
 		}
 
+		/// <summary>Closest point on the segment AB. t is 0 at A and 1 at B.</summary>
+		public static PlotPoint ClosestOnSegment(PlotPoint p, PlotPoint a, PlotPoint b, out double t)
+		{
+			double dx = b.X - a.X;
+			double dy = b.Y - a.Y;
+			double len2 = dx * dx + dy * dy;
+			if (len2 < Eps)
+			{
+				t = 0;
+				return a;
+			}
+			t = ((p.X - a.X) * dx + (p.Y - a.Y) * dy) / len2;
+			if (t < 0) t = 0;
+			else if (t > 1) t = 1;
+			return new PlotPoint(a.X + dx * t, a.Y + dy * t);
+		}
+
+		/// <summary>
+		/// True when the open segment passes through the polygon interior.
+		/// Ending on the boundary, or travelling along an edge, does not count.
+		/// </summary>
+		public static bool SegmentThroughInterior(PlotPoint a, PlotPoint b, IList<PlotPoint> poly)
+		{
+			if (poly == null || poly.Count < 3)
+				return false;
+			if (Dist(a, b) < 1e-6)
+				return false;
+
+			int n = poly.Count;
+			for (int i = 0; i < n; i++)
+			{
+				if (ProperEdgeCross(a, b, poly[i], poly[(i + 1) % n]))
+					return true;
+			}
+
+			PlotPoint mid = new PlotPoint((a.X + b.X) * 0.5, (a.Y + b.Y) * 0.5);
+			return PointInPoly(mid, poly);
+		}
+
+		private static bool ProperEdgeCross(PlotPoint a, PlotPoint b, PlotPoint c, PlotPoint d)
+		{
+			double rx = b.X - a.X;
+			double ry = b.Y - a.Y;
+			double sx = d.X - c.X;
+			double sy = d.Y - c.Y;
+			double den = rx * sy - ry * sx;
+			if (Math.Abs(den) < 1e-12)
+				return false;
+			double qpx = c.X - a.X;
+			double qpy = c.Y - a.Y;
+			double t = (qpx * sy - qpy * sx) / den;
+			double u = (qpx * ry - qpy * rx) / den;
+			const double eps = 1e-6;
+			return t > eps && t < 1.0 - eps && u > eps && u < 1.0 - eps;
+		}
+
 		public static void SampleArc(List<PlotPoint> pts, PlotPoint start, PlotPoint end, double i, double j, bool clockwise, double stepDeg)
 		{
 			double cx = start.X + i;

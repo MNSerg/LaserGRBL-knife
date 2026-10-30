@@ -22,17 +22,18 @@ namespace LaserGRBL.Plotter
 				return moves;
 
 			int passes = cfg.Passes;
+			PlotPoint cursor = new PlotPoint(0, 0);
 			foreach (PlotPath path in paths)
 			{
 				if (path == null || path.Points == null || path.Points.Count < 2)
 					continue;
 				for (int pass = 0; pass < passes; pass++)
-					Emit(path, cfg, moves);
+					Emit(path, cfg, moves, paths, ref cursor);
 			}
 			return moves;
 		}
 
-		private static void Emit(PlotPath path, PlotterConfig cfg, List<PlotMove> moves)
+		private static void Emit(PlotPath path, PlotterConfig cfg, List<PlotMove> moves, IList<PlotPath> obstacles, ref PlotPoint cursor)
 		{
 			List<PlotPoint> pts = Compact(path.Points);
 			if (pts.Count < 2)
@@ -54,8 +55,29 @@ namespace LaserGRBL.Plotter
 			double lead = cfg.LeadInMm;
 			double over = cfg.OvercutMm;
 			PlotPoint u0 = dir[0];
+			PlotPoint holderStart = Shift(pts[0], u0, offset - lead);
 
-			Travel(moves, Shift(pts[0], u0, offset - lead));
+			if (cfg.PenMode == PlotterPenMode.Manual)
+			{
+				double margin = lead;
+				if (offset > margin)
+					margin = offset;
+				if (margin < 1)
+					margin = 1;
+				List<PlotPoint> route = SafeRoute.Route(cursor, holderStart, obstacles, margin);
+				PlotPoint at = cursor;
+				for (int r = 0; r < route.Count; r++)
+				{
+					if (PlotGeom.Dist(at, route[r]) <= 0.0001)
+						continue;
+					Travel(moves, route[r]);
+					at = route[r];
+				}
+			}
+			else
+			{
+				Travel(moves, holderStart);
+			}
 			if (lead > 0.0001)
 				Line(moves, Shift(pts[0], u0, offset));
 			Line(moves, Shift(Next(pts, 0, closed), u0, offset));
@@ -76,6 +98,12 @@ namespace LaserGRBL.Plotter
 			else if (over > 0.0001)
 			{
 				Line(moves, Shift(pts[pts.Count - 1], dir[segCount - 1], offset + over));
+			}
+
+			if (moves.Count > 0)
+			{
+				PlotMove last = moves[moves.Count - 1];
+				cursor = new PlotPoint(last.X, last.Y);
 			}
 		}
 

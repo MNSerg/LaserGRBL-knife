@@ -58,7 +58,7 @@ namespace LaserGRBL.Plotter
 			MinimizeBox = false;
 			ShowInTaskbar = false;
 			AutoScaleMode = AutoScaleMode.Font;
-			ClientSize = new Size(640, 690);
+			ClientSize = new Size(680, 740);
 			Font = SystemFonts.MessageBoxFont;
 			try
 			{
@@ -77,7 +77,7 @@ namespace LaserGRBL.Plotter
 			Controls.Add(table);
 
 			mEnabled = new CheckBox();
-			mEnabled.Text = Tr("Plotter mode when importing images and SVG", "Режим плоттера при импорте изображений и SVG");
+			mEnabled.Text = Tr("Plotter mode when importing images, SVG and DXF", "Режим плоттера при импорте изображений, SVG и DXF");
 			mEnabled.AutoSize = true;
 			mEnabled.Margin = new Padding(3, 6, 3, 8);
 			table.Controls.Add(mEnabled, 0, 0);
@@ -96,7 +96,7 @@ namespace LaserGRBL.Plotter
 			mOffset = AddNum(table, Tr("Blade offset, mm", "Смещение лезвия, мм"), 0, 20, 2, 0.05m);
 			mOvercut = AddNum(table, Tr("Overcut, mm", "Перерез (overcut), мм"), 0, 50, 2, 0.1m);
 			mLeadIn = AddNum(table, Tr("Lead-in, mm", "Заход для разворота, мм"), 0, 50, 2, 0.1m);
-			mCorner = AddNum(table, Tr("Corner arc from, deg", "Дуга на угле от, град"), 0, 180, 0, 1);
+			mCorner = AddNum(table, Tr("Sharp corner from, deg", "Острый угол от, град"), 0, 180, 0, 1);
 			mLift = AddNum(table, Tr("Lift knife above, deg (0 = never)", "Поднимать нож свыше, град (0 = никогда)"), 0, 180, 0, 1);
 			mSimplify = AddNum(table, Tr("Simplify tolerance, mm", "Упрощение пути, мм"), 0, 5, 2, 0.01m);
 			mMinSeg = AddNum(table, Tr("Minimum segment, mm", "Мин. отрезок, мм"), 0, 5, 2, 0.01m);
@@ -120,19 +120,19 @@ namespace LaserGRBL.Plotter
 			mZUp = AddNum(table, Tr("Z up, mm", "Z вверх, мм"), -50, 200, 2, 0.1m);
 			mZDown = AddNum(table, Tr("Z down, mm", "Z вниз, мм"), -50, 200, 2, 0.1m);
 			mOrder = AddCheck(table, Tr("Sort contours (short travels, small swivels)", "Сортировать контуры (короче переезды, меньше разворотов)"));
-			mInside = AddCheck(table, Tr("Cut inner contours first", "Сначала внутренние контуры"));
+			mInside = AddCheck(table, Tr("Cut holes first when the knife can reach them", "Сначала отверстия, если к ним можно подойти"));
 			mLinearize = AddCheck(table, Tr("Replace corner arcs with short lines", "Заменять дуги поворота короткими отрезками"));
 
 			Label help = new Label();
 			help.AutoSize = false;
-			help.Height = 88;
+			help.Height = 124;
 			help.Dock = DockStyle.Top;
 			help.Text = Tr(
-				"This machine has no Z. Set the blade height by hand before the job (usually on the table, to cut 1 mm rubber through). The program moves only X and Y, so a move between shapes also cuts. Blade offset, overcut, lead-in and cut speed stay editable. One pass is the default. Hatch fill is not generated: outlines, holes and internal lines are cut. Use Vectorize for silhouettes and Centerline for stroke drawings.",
-				"Оси Z нет. Высоту ножа выставьте вручную до пуска (обычно в стол, чтобы прорезать резину 1 мм). Программа двигает только X и Y, поэтому переезд между контурами тоже режет. Смещение, перерез, заход и скорость реза можно менять. По умолчанию один проход. Штриховка не строится: режутся контур, отверстия и внутренние линии. Силуэты — «Векторизация», штриховой рисунок — «Центральная линия».");
+				"This machine has no Z. Set the blade height by hand before the job (usually on the table, to cut 1 mm rubber through). Every XY move is G1 at cut speed: the knife never rapids. The job starts at X0 Y0, so put that zero in the scrap outside the drawing. The knife walks around a shape and enters at the nearest point; it does not cut across the middle to reach the start. A turn smaller than the sharp-corner angle follows the curve. A sharper corner swings the holder around the tip on an arc of the blade offset, so the corner stays sharp. One pass, no hatch.",
+				"Оси Z нет. Высоту ножа выставьте вручную до пуска (обычно в стол, чтобы прорезать резину 1 мм). Любое движение X Y — это G1 на скорости реза, быстрых G0 нет. Программа считает, что нож стоит в X0 Y0: поставьте этот ноль в отход, снаружи рисунка. К фигуре нож подходит снаружи, в ближайшую точку, и не режет её посредине по пути к старту. Поворот меньше порога острого угла идёт по кривой. Более острый угол — дуга держателя вокруг острия радиусом смещения, поэтому угол остаётся острым. Один проход, без штриховки.");
 			table.Controls.Add(help, 0, table.RowCount);
 			table.SetColumnSpan(help, 2);
-			table.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
+			table.RowStyles.Add(new RowStyle(SizeType.Absolute, 132));
 
 			FlowLayoutPanel buttons = new FlowLayoutPanel();
 			buttons.FlowDirection = FlowDirection.RightToLeft;

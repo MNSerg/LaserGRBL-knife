@@ -152,6 +152,108 @@ M5";
 		}
 
 		[Fact]
+		public void Manual_approach_enters_at_the_near_corner()
+		{
+			PlotterConfig cfg = PlotterConfig.CreateDefault();
+			cfg.SimplifyMm = 0;
+			cfg.MinSegmentMm = 0;
+			cfg.BladeOffsetMm = 3.6;
+			cfg.LeadInMm = 3.6;
+			cfg.OvercutMm = 3.6;
+			cfg.CutSpeed = 600;
+			cfg.TravelSpeed = 0;
+			cfg.OptimizeOrder = true;
+			cfg.InsideFirst = true;
+
+			PlotPath square = new PlotPath();
+			square.Closed = true;
+			square.Points.Add(new PlotPoint(30, 30));
+			square.Points.Add(new PlotPoint(10, 30));
+			square.Points.Add(new PlotPoint(10, 10));
+			square.Points.Add(new PlotPoint(30, 10));
+
+			string gcode = PlotterPipeline.ConvertPaths(new[] { square }, cfg);
+			Assert.DoesNotContain("G0", gcode);
+
+			PlotPoint first = FirstMove(gcode);
+			Assert.True(PlotGeom.Dist(first, new PlotPoint(10, 10)) < 0.05, first.X + "," + first.Y);
+			Assert.False(PlotGeom.SegmentThroughInterior(new PlotPoint(0, 0), first, square.Points));
+		}
+
+		[Fact]
+		public void Manual_approach_does_not_cross_the_outline_to_reach_a_hole()
+		{
+			PlotterConfig cfg = PlotterConfig.CreateDefault();
+			cfg.SimplifyMm = 0;
+			cfg.MinSegmentMm = 0;
+			cfg.BladeOffsetMm = 0;
+			cfg.LeadInMm = 0;
+			cfg.OvercutMm = 0;
+			cfg.CornerThresholdDeg = 180;
+			cfg.OptimizeOrder = true;
+			cfg.InsideFirst = true;
+
+			PlotPath outer = Rect(20, 20, 80, 80);
+			PlotPath inner = Rect(40, 40, 60, 60);
+			string gcode = PlotterPipeline.ConvertPaths(new[] { outer, inner }, cfg);
+			PlotPoint first = FirstMove(gcode);
+			Assert.False(PlotGeom.SegmentThroughInterior(new PlotPoint(0, 0), first, outer.Points));
+			Assert.True(PlotGeom.Dist(first, new PlotPoint(20, 20)) < 0.05, first.X + "," + first.Y);
+		}
+
+		[Fact]
+		public void Route_walks_around_a_blocking_square()
+		{
+			PlotPath wall = Rect(10, 10, 20, 20);
+			List<PlotPoint> route = SafeRoute.Route(new PlotPoint(0, 0), new PlotPoint(30, 30), new[] { wall }, 1);
+			Assert.True(PlotGeom.Dist(route[route.Count - 1], new PlotPoint(30, 30)) < 0.001);
+			PlotPoint prev = new PlotPoint(0, 0);
+			for (int i = 0; i < route.Count; i++)
+			{
+				Assert.False(PlotGeom.SegmentThroughInterior(prev, route[i], wall.Points));
+				prev = route[i];
+			}
+		}
+
+		[Fact]
+		public void Dxf_reads_line_polyline_circle_bulge_and_inches()
+		{
+			string dxf = "0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"
+				+ "0\nLINE\n10\n0\n20\n0\n11\n10\n21\n0\n"
+				+ "0\nLWPOLYLINE\n90\n4\n70\n1\n10\n0\n20\n0\n10\n5\n20\n0\n10\n5\n20\n5\n10\n0\n20\n5\n"
+				+ "0\nLWPOLYLINE\n90\n2\n70\n0\n10\n0\n20\n0\n42\n1\n10\n2\n20\n0\n"
+				+ "0\nCIRCLE\n10\n10\n20\n10\n40\n2\n"
+				+ "0\nENDSEC\n0\nEOF\n";
+			List<PlotPath> paths = DxfReader.Read(dxf);
+			Assert.Contains(paths, p => p.Closed && p.Points.Count == 4 && p.Points.Any(pt => Math.Abs(pt.X - 5) < 0.01 && Math.Abs(pt.Y - 5) < 0.01));
+			Assert.Contains(paths, p => p.Closed && p.Points.Count > 8);
+			Assert.Contains(paths, p => !p.Closed && p.Points.Any(pt => Math.Abs(pt.Y) > 0.5));
+
+			string arc = "0\nSECTION\n2\nENTITIES\n0\nARC\n10\n0\n20\n0\n40\n10\n50\n0\n51\n90\n0\nENDSEC\n0\nEOF\n";
+			List<PlotPath> arcPaths = DxfReader.Read(arc);
+			Assert.Single(arcPaths);
+			Assert.True(Math.Abs(arcPaths[0].Points[0].X - 10) < 0.05);
+			Assert.True(Math.Abs(arcPaths[0].Points[0].Y) < 0.05);
+			Assert.True(Math.Abs(arcPaths[0].Points[arcPaths[0].Points.Count - 1].X) < 0.05);
+			Assert.True(Math.Abs(arcPaths[0].Points[arcPaths[0].Points.Count - 1].Y - 10) < 0.05);
+
+			string inches = "0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n1\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"
+				+ "0\nLINE\n10\n0\n20\n0\n11\n1\n21\n0\n0\nENDSEC\n0\nEOF\n";
+			List<PlotPath> inchPaths = DxfReader.Read(inches);
+			Assert.Single(inchPaths);
+			Assert.True(Math.Abs(inchPaths[0].Points[1].X - 25.4) < 0.01);
+
+			string block = "0\nSECTION\n2\nBLOCKS\n0\nBLOCK\n2\nSLOT\n10\n0\n20\n0\n"
+				+ "0\nLINE\n10\n0\n20\n0\n11\n4\n21\n0\n0\nENDBLK\n0\nENDSEC\n"
+				+ "0\nSECTION\n2\nENTITIES\n0\nINSERT\n2\nSLOT\n10\n5\n20\n6\n50\n0\n0\nENDSEC\n0\nEOF\n";
+			List<PlotPath> inserted = DxfReader.Read(block);
+			Assert.Single(inserted);
+			Assert.True(Math.Abs(inserted[0].Points[0].X - 5) < 0.01);
+			Assert.True(Math.Abs(inserted[0].Points[0].Y - 6) < 0.01);
+			Assert.True(Math.Abs(inserted[0].Points[1].X - 9) < 0.01);
+		}
+
+		[Fact]
 		public void Manual_height_emits_xy_only_at_cut_speed()
 		{
 			PlotterConfig cfg = PlotterConfig.CreateDefault();
@@ -175,6 +277,29 @@ M5";
 			Assert.DoesNotContain("G0 ", result);
 			Assert.DoesNotContain(" Z", result);
 			Assert.Contains("G3", result);
+		}
+
+		private static PlotPoint FirstMove(string gcode)
+		{
+			string[] lines = gcode.Split('\n');
+			for (int i = 0; i < lines.Length; i++)
+			{
+				string line = lines[i].Trim();
+				if (line.StartsWith("G0") || line.StartsWith("G1") || line.StartsWith("G2") || line.StartsWith("G3"))
+					return new PlotPoint(Word(line, 'X'), Word(line, 'Y'));
+			}
+			throw new InvalidOperationException("no motion");
+		}
+
+		private static double Word(string line, char axis)
+		{
+			int at = line.IndexOf(axis);
+			if (at < 0)
+				return 0;
+			int end = at + 1;
+			while (end < line.Length && (char.IsDigit(line[end]) || line[end] == '.' || line[end] == '-' || line[end] == '+'))
+				end++;
+			return double.Parse(line.Substring(at + 1, end - at - 1), System.Globalization.CultureInfo.InvariantCulture);
 		}
 
 		private static PlotterConfig Knife()

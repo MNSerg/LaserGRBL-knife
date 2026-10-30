@@ -16,6 +16,8 @@
     <Compile Include="..\LaserGRBL\Plotter\GCodePathReader.cs" Link="Plotter\GCodePathReader.cs" />
     <Compile Include="..\LaserGRBL\Plotter\PathOptimizer.cs" Link="Plotter\PathOptimizer.cs" />
     <Compile Include="..\LaserGRBL\Plotter\DragKnife.cs" Link="Plotter\DragKnife.cs" />
+    <Compile Include="..\LaserGRBL\Plotter\SafeRoute.cs" Link="Plotter\SafeRoute.cs" />
+    <Compile Include="..\LaserGRBL\Plotter\DxfReader.cs" Link="Plotter\DxfReader.cs" />
     <Compile Include="..\LaserGRBL\Plotter\PlotterGCodeWriter.cs" Link="Plotter\PlotterGCodeWriter.cs" />
     <Compile Include="..\LaserGRBL\Plotter\PlotterPipeline.cs" Link="Plotter\PlotterPipeline.cs" />
   </ItemGroup>

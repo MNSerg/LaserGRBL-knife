@@ -26,7 +26,10 @@ namespace LaserGRBL.Plotter
 			sb.Append(" paths ").Append(pathCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
 			sb.Append(" pen ").Append(cfg.PenMode.ToString()).Append(")\r\n");
 			if (cfg.PenMode == PlotterPenMode.Manual)
+			{
 				sb.Append("(manual knife height, blade stays down)\r\n");
+				sb.Append("(every XY move is a cut; the approach does not cross a contour)\r\n");
+			}
 			sb.Append("G90\r\n");
 
 			bool manual = cfg.PenMode == PlotterPenMode.Manual;
@@ -111,9 +114,19 @@ namespace LaserGRBL.Plotter
 
 		private static void Rapid(StringBuilder sb, PlotterConfig cfg, double x, double y)
 		{
+			// The knife is already in the material, so a rapid would still cut.
+			// Write the approach at feed rate and let the path planner keep it outside the part.
+			if (cfg.PenMode == PlotterPenMode.Manual)
+			{
+				int stayDown = cfg.TravelSpeed > 0 ? cfg.TravelSpeed : cfg.CutSpeed;
+				if (stayDown <= 0)
+					stayDown = 1;
+				sb.Append("G1 X").Append(PlotGeom.Num(x)).Append(" Y").Append(PlotGeom.Num(y));
+				sb.Append(" F").Append(stayDown.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append("\r\n");
+				return;
+			}
+
 			int feed = cfg.TravelSpeed;
-			if (cfg.PenMode == PlotterPenMode.Manual && feed <= 0)
-				feed = cfg.CutSpeed;
 			if (feed <= 0)
 			{
 				sb.Append("G0 X").Append(PlotGeom.Num(x)).Append(" Y").Append(PlotGeom.Num(y)).Append("\r\n");

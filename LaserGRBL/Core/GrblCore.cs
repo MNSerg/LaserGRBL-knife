@@ -665,7 +665,7 @@ namespace LaserGRBL
 						if (lastFN != null && System.IO.File.Exists(lastFN))
 							ofd.FileName = lastFN;
 
-						ofd.Filter = "Any supported file|*.nc;*.cnc;*.tap;*.gcode;*.ngc;*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.svg;*.lps|GCODE Files|*.nc;*.cnc;*.tap;*.gcode;*.ngc|Raster Image|*.bmp;*.png;*.jpg;*.jpeg;*.gif|Vector Image (experimental)|*.svg|LaserGRBL Project|*.lps";
+						ofd.Filter = "Any supported file|*.nc;*.cnc;*.tap;*.gcode;*.ngc;*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.svg;*.dxf;*.lps|GCODE Files|*.nc;*.cnc;*.tap;*.gcode;*.ngc|Raster Image|*.bmp;*.png;*.jpg;*.jpeg;*.gif|Vector Image (experimental)|*.svg;*.dxf|LaserGRBL Project|*.lps";
 						ofd.CheckFileExists = true;
 						ofd.Multiselect = false;
 						ofd.RestoreDirectory = true;
@@ -749,6 +749,15 @@ namespace LaserGRBL
 						catch (Exception ex)
 						{ Logger.LogException("SvgBmpImport", ex); }
 					}
+				}
+				else if (System.IO.Path.GetExtension(filename).ToLowerInvariant() == ".dxf")
+				{
+					try
+					{
+						file.LoadDxf(filename, append);
+					}
+					catch (Exception ex)
+					{ Logger.LogException("DxfImport", ex); }
 				}
 				else if (GCodeExtensions.Contains(System.IO.Path.GetExtension(filename).ToLowerInvariant()))  //load GCODE file
 				{

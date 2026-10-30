@@ -27,6 +27,9 @@ namespace LaserGRBL.Plotter
 					clean.Add(path);
 			}
 
+			if (cfg.PenMode == PlotterPenMode.Manual)
+				return OrderKnifeDown(clean, cfg);
+
 			if (clean.Count <= 1 || (!cfg.OptimizeOrder && !cfg.InsideFirst))
 				return clean;
 
@@ -66,6 +69,203 @@ namespace LaserGRBL.Plotter
 				}
 			}
 			return ordered;
+		}
+
+		/// <summary>
+		/// The blade stays down, so the first move is a cut. Start each closed
+		/// contour at the boundary point closest to the knife, and do not walk
+		/// across a contour to reach it. A hole that cannot be reached from
+		/// outside waits until every reachable outline has been cut.
+		/// </summary>
+		private static List<PlotPath> OrderKnifeDown(List<PlotPath> clean, PlotterConfig cfg)
+		{
+			List<PlotPath> ordered = new List<PlotPath>();
+			if (clean.Count == 0)
+				return ordered;
+
+			int[] depth = new int[clean.Count];
+			if (cfg.InsideFirst)
+				depth = ComputeDepth(clean);
+
+			List<int> left = new List<int>();
+			for (int i = 0; i < clean.Count; i++)
+				left.Add(i);
+
+			PlotPoint cursor = new PlotPoint(0, 0);
+			double heading = 0;
+			bool haveHeading = false;
+			bool reorder = cfg.OptimizeOrder && clean.Count > 1;
+
+			while (left.Count > 0)
+			{
+				int pick = 0;
+				if (reorder || cfg.InsideFirst)
+				{
+					double bestScore = double.MaxValue;
+					for (int s = 0; s < left.Count; s++)
+					{
+						if (!reorder && s > 0 && !cfg.InsideFirst)
+							break;
+						PlotPath oriented;
+						double cost;
+						PlotPoint end;
+						double exitHeading;
+						oriented = BestKnifeOrientation(clean[left[s]], cursor, heading, haveHeading, clean, cfg, out cost, out end, out exitHeading);
+						double score = cost;
+						if (cfg.InsideFirst && cost < 1e8)
+							score -= depth[left[s]] * 100000.0;
+						if (!reorder && cfg.InsideFirst)
+						{
+							// Keep the original order inside a depth, but still
+							// finish every reachable deeper contour first.
+							score = (cost < 1e8 ? -depth[left[s]] * 100000.0 : 1e9) + s;
+						}
+						if (score < bestScore)
+						{
+							bestScore = score;
+							pick = s;
+						}
+					}
+				}
+
+				PlotPath chosen;
+				double chosenCost;
+				PlotPoint chosenEnd;
+				double chosenHeading;
+				chosen = BestKnifeOrientation(clean[left[pick]], cursor, heading, haveHeading, clean, cfg, out chosenCost, out chosenEnd, out chosenHeading);
+				ordered.Add(chosen);
+				cursor = chosenEnd;
+				heading = chosenHeading;
+				haveHeading = true;
+				left.RemoveAt(pick);
+			}
+			return ordered;
+		}
+
+		private static PlotPath BestKnifeOrientation(PlotPath path, PlotPoint cursor, double heading, bool haveHeading, IList<PlotPath> obstacles, PlotterConfig cfg, out double cost, out PlotPoint end, out double exitHeading)
+		{
+			bool closed = path.Closed && path.Points.Count >= 3;
+			PlotPath best = path;
+			cost = double.MaxValue;
+			end = path.Points[path.Points.Count - 1];
+			exitHeading = heading;
+
+			for (int rev = 0; rev < 2; rev++)
+			{
+				List<PlotPoint> ring = rev == 0 ? path.Points : Reversed(path.Points);
+				if (!closed)
+				{
+					ConsiderEntry(ring, 0, 0, false, cursor, heading, haveHeading, obstacles, cfg, ref best, ref cost, ref end, ref exitHeading);
+					continue;
+				}
+				int edge;
+				double t;
+				ClosestEdge(ring, cursor, out edge, out t);
+				ConsiderEntry(ring, edge, t, true, cursor, heading, haveHeading, obstacles, cfg, ref best, ref cost, ref end, ref exitHeading);
+			}
+
+			if (closed && cost >= 1e8)
+			{
+				for (int rev = 0; rev < 2; rev++)
+				{
+					List<PlotPoint> ring = rev == 0 ? path.Points : Reversed(path.Points);
+					int n = ring.Count;
+					int step = n > 48 ? n / 48 : 1;
+					if (step < 1)
+						step = 1;
+					for (int e = 0; e < n; e += step)
+						ConsiderEntry(ring, e, 0, true, cursor, heading, haveHeading, obstacles, cfg, ref best, ref cost, ref end, ref exitHeading);
+				}
+			}
+			return best;
+		}
+
+		private static void ClosestEdge(List<PlotPoint> ring, PlotPoint cursor, out int edge, out double t)
+		{
+			edge = 0;
+			t = 0;
+			double best = double.MaxValue;
+			int n = ring.Count;
+			for (int i = 0; i < n; i++)
+			{
+				double edgeT;
+				PlotPoint point = PlotGeom.ClosestOnSegment(cursor, ring[i], ring[(i + 1) % n], out edgeT);
+				double dist = PlotGeom.Dist(cursor, point);
+				if (dist < best)
+				{
+					best = dist;
+					edge = i;
+					t = edgeT;
+				}
+			}
+		}
+
+		private static void ConsiderEntry(List<PlotPoint> ring, int edge, double t, bool closed, PlotPoint cursor, double heading, bool haveHeading, IList<PlotPath> obstacles, PlotterConfig cfg, ref PlotPath best, ref double cost, ref PlotPoint end, ref double exitHeading)
+		{
+			List<PlotPoint> pts = closed ? StartAt(ring, edge, t) : new List<PlotPoint>(ring);
+			if (pts.Count < 2)
+				return;
+			PlotPoint dir = PlotGeom.Normalize(PlotGeom.Sub(pts[1], pts[0]));
+			if (dir.X == 0 && dir.Y == 0)
+				return;
+
+			double along = cfg.BladeOffsetMm - cfg.LeadInMm;
+			PlotPoint target = new PlotPoint(pts[0].X + dir.X * along, pts[0].Y + dir.Y * along);
+			bool clear = !SafeRoute.Hits(cursor, target, obstacles);
+			double travel = PlotGeom.Dist(cursor, target);
+			double turn = 0;
+			if (haveHeading)
+				turn = Math.Abs(PlotGeom.DeltaAngle(heading, PlotGeom.Heading(dir))) * 180.0 / Math.PI;
+			double c = travel + 0.03 * turn;
+			if (!clear)
+				c += 1e9;
+			if (c >= cost)
+				return;
+
+			cost = c;
+			PlotPath oriented = new PlotPath();
+			oriented.Points = pts;
+			oriented.Closed = closed && pts.Count >= 3;
+			best = oriented;
+			double shift = cfg.BladeOffsetMm + cfg.OvercutMm;
+			if (oriented.Closed)
+			{
+				end = new PlotPoint(pts[0].X + dir.X * shift, pts[0].Y + dir.Y * shift);
+				exitHeading = PlotGeom.Heading(dir);
+			}
+			else
+			{
+				PlotPoint exitDir = PlotGeom.Normalize(PlotGeom.Sub(pts[pts.Count - 1], pts[pts.Count - 2]));
+				end = new PlotPoint(pts[pts.Count - 1].X + exitDir.X * shift, pts[pts.Count - 1].Y + exitDir.Y * shift);
+				exitHeading = PlotGeom.Heading(exitDir);
+			}
+		}
+
+		private static List<PlotPoint> StartAt(List<PlotPoint> ring, int edge, double t)
+		{
+			int n = ring.Count;
+			List<PlotPoint> pts = new List<PlotPoint>();
+			if (t <= 0.0001)
+			{
+				for (int i = 0; i < n; i++)
+					pts.Add(ring[(edge + i) % n]);
+				return pts;
+			}
+			if (t >= 0.9999)
+			{
+				int start = (edge + 1) % n;
+				for (int i = 0; i < n; i++)
+					pts.Add(ring[(start + i) % n]);
+				return pts;
+			}
+
+			PlotPoint a = ring[edge];
+			PlotPoint b = ring[(edge + 1) % n];
+			pts.Add(new PlotPoint(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t));
+			int v = (edge + 1) % n;
+			for (int i = 0; i < n; i++)
+				pts.Add(ring[(v + i) % n]);
+			return pts;
 		}
 
 		private static void TakeNearest(List<PlotPath> clean, List<int> bucket, List<PlotPath> ordered, ref PlotPoint cursor, ref double heading, ref bool haveHeading)

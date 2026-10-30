@@ -7,7 +7,7 @@ LaserGRBL is a Windows GUI for [GRBL](https://github.com/gnea/grbl/wiki). Unlike
 
 This copy can drive a laser that was converted into a plotter with a passive swivel blade. Laser jobs are unchanged until plotter mode is turned on.
 
-Open **Grbl → Plotter...** (Плоттер...). The machine this mode is set up for has no Z axis: blade height is set by hand before the job, and the program sends only X and Y. Default blade offset is 3.60 mm (editable), overcut and lead-in match it, cut speed starts at 600 mm/min (editable in the same dialog and in the import window), one pass. A move between separate contours also cuts, because the knife stays down. Hatch fill is not generated. Vectorize keeps outlines and holes; Centerline keeps stroke lines.
+Open **Grbl → Plotter...** (Плоттер...). The machine this mode is set up for has no Z axis: blade height is set by hand before the job, and the program sends only X and Y. Default blade offset is 3.60 mm (editable), overcut and lead-in match it, cut speed starts at 600 mm/min (editable in the same dialog and in the import window), one pass. A move between separate contours also cuts, because the knife stays down, so every XY move is G1 at cut speed. Set work zero in the scrap outside the drawing: the knife walks around a shape and enters at the nearest point instead of cutting across it. Hatch fill is not generated. Vectorize keeps outlines and holes; Centerline keeps stroke lines. DXF files (ASCII) open from the same File dialog as SVG: LINE, LWPOLYLINE, POLYLINE, ARC, CIRCLE, ELLIPSE, SPLINE and block INSERT.
 
 **File → Apply plotter to loaded file** runs the same compensation on G-code that is already open. Do not run it twice on the same file.
 
@@ -37,7 +37,7 @@ Do you like LaserGRBL? Support development with your donation!
 - Image import (jpg, bmp...) with line by line GCode generation (horizontal, vertical, and diagonal).
 - Image import (jpg, bmp...) with Vectorization!
 - Image import (jpg, bmp...) with 1bit dithering, best result with low power laser
-- Vector file import (svg only) [Experimental]
+- Vector file import (svg, and DXF in plotter mode) [Experimental]
 - Different color scheme optimized for different safety glasses
 - User defined buttons, power to you!
 - Grbl Configuration Import/Export

@@ -30,6 +30,18 @@ namespace LaserGRBL.Plotter
 			cfg.DwellDownMs = LaserGRBL.Settings.GetObject("Plotter.DwellDownMs", def.DwellDownMs);
 			cfg.DwellUpMs = LaserGRBL.Settings.GetObject("Plotter.DwellUpMs", def.DwellUpMs);
 			cfg.PenMode = (PlotterPenMode)LaserGRBL.Settings.GetObject("Plotter.PenMode", (int)def.PenMode);
+			// Older builds stored a servo lift and wrote the first move as G0.
+			// This machine keeps the knife down, so that first move has to be G1.
+			int schema = LaserGRBL.Settings.GetObject("Plotter.Schema", 0);
+			if (schema < 3)
+			{
+				if (cfg.PenMode == PlotterPenMode.ServoPwm && cfg.TravelSpeed <= 0 && cfg.LiftAngleDeg <= 0)
+				{
+					cfg.PenMode = PlotterPenMode.Manual;
+					LaserGRBL.Settings.SetObject("Plotter.PenMode", (int)PlotterPenMode.Manual);
+				}
+				LaserGRBL.Settings.SetObject("Plotter.Schema", 3);
+			}
 			cfg.ServoUp = LaserGRBL.Settings.GetObject("Plotter.ServoUp", def.ServoUp);
 			cfg.ServoDown = LaserGRBL.Settings.GetObject("Plotter.ServoDown", def.ServoDown);
 			cfg.PenUpZ = LaserGRBL.Settings.GetObject("Plotter.PenUpZ", def.PenUpZ);

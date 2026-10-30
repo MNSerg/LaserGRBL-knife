@@ -874,6 +874,8 @@
     <Compile Include="Plotter\GCodePathReader.cs" />
     <Compile Include="Plotter\PathOptimizer.cs" />
     <Compile Include="Plotter\DragKnife.cs" />
+    <Compile Include="Plotter\SafeRoute.cs" />
+    <Compile Include="Plotter\DxfReader.cs" />
     <Compile Include="Plotter\PlotterGCodeWriter.cs" />
     <Compile Include="Plotter\PlotterPipeline.cs" />
     <Compile Include="Plotter\PotracePaths.cs" />

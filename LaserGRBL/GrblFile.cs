@@ -122,6 +122,44 @@ namespace LaserGRBL
             mLoadingThread.Start();
         }
 
+		public void LoadDxf(string filename, bool append)
+		{
+			SafeLoadFile(() =>
+			{
+				RiseOnFileLoading(filename);
+				long started = Tools.HiResTimer.TotalMilliseconds;
+				if (!append)
+					ClearList();
+				mRange.ResetRange();
+				try
+				{
+					string text = System.IO.File.ReadAllText(filename);
+					List<PlotPath> paths = DxfReader.Read(text);
+					PlotterConfig cfg = PlotterSettings.Load();
+					string gcode;
+					if (cfg.Enabled)
+					{
+						int speed = Settings.GetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", cfg.CutSpeed);
+						if (speed > 0)
+							cfg.CutSpeed = speed;
+						gcode = PlotterPipeline.ConvertPaths(paths, cfg);
+					}
+					else
+					{
+						int speed = Settings.GetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", 1000);
+						gcode = DxfReader.ToContourGCode(paths, speed);
+					}
+					AddGeneratedLines(gcode);
+				}
+				catch (Exception ex)
+				{
+					Logger.LogException("DxfImport", ex);
+				}
+				Analyze();
+				RiseOnFileLoaded(filename, Tools.HiResTimer.TotalMilliseconds - started);
+			});
+		}
+
 		public void LoadFile(string filename, bool append)
         {
             SafeLoadFile(() =>
