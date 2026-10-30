@@ -868,6 +868,19 @@
     <Compile Include="CSV\FormattedMessage.cs" />
     <Compile Include="GrblCommand.cs" />
     <Compile Include="GrblFile.cs" />
+    <Compile Include="Plotter\PlotPoint.cs" />
+    <Compile Include="Plotter\PlotterConfig.cs" />
+    <Compile Include="Plotter\PlotGeom.cs" />
+    <Compile Include="Plotter\GCodePathReader.cs" />
+    <Compile Include="Plotter\PathOptimizer.cs" />
+    <Compile Include="Plotter\DragKnife.cs" />
+    <Compile Include="Plotter\PlotterGCodeWriter.cs" />
+    <Compile Include="Plotter\PlotterPipeline.cs" />
+    <Compile Include="Plotter\PotracePaths.cs" />
+    <Compile Include="Plotter\PlotterSettings.cs" />
+    <Compile Include="Plotter\PlotterSettingsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="HotkeyManagerForm.cs">
       <SubType>Form</SubType>
     </Compile>

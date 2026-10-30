@@ -3,6 +3,32 @@ Official website [http://lasergrbl.com](http://lasergrbl.com)
 
 LaserGRBL is a Windows GUI for [GRBL](https://github.com/gnea/grbl/wiki). Unlike other GUI LaserGRBL it is specifically developed for use with laser cutter and engraver. In order to use all of LaserGRBL feature, your engraver must supports laser power modulation through gcode "S" command. LaserGRBL is compatible with [Grbl v0.9](https://github.com/grbl/grbl/) and [Grbl v1.1](https://github.com/gnea/grbl/)
 
+### Plotter mode (drag knife)
+
+This copy can drive a laser that was converted into a plotter with a passive swivel blade. Laser jobs are unchanged until plotter mode is turned on.
+
+Open **Grbl → Plotter...** (Плоттер...). Set the blade offset (distance from the swivel axis to the tip), overcut, lead-in, speeds, and how the knife is raised:
+
+- Servo on the laser PWM pin (`M3 S`, default S=0 up and S=255 down). Prefer GRBL `$32=0` so the PWM value is not cleared during G0.
+- Solenoid: `M3` down, `M5` up.
+- Z axis: `G0 Z` up, `G1 Z` down.
+
+With the mode enabled, SVG files and image vectorization / centerline are rebuilt for the knife: contours are simplified, inner shapes are cut before the outline, travel is shortened, and each corner becomes an arc of radius equal to the blade offset so the tip stays on the vertex while the blade turns. The preview shows the swivel-axis path (slightly outside the design); the tip follows the original line. Raster engraving is not used. Border speed in the import dialog is the cut speed.
+
+**File → Apply plotter to loaded file** runs the same compensation on G-code that is already open. Do not run it twice on the same file.
+
+Build on Windows (Visual Studio 2022 with the .NET desktop workload):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build\Build-Windows.ps1
+```
+
+The script compiles against .NET Framework 4.8 and writes `dist\LaserGRBL-Plotter-win.zip`. Unzip it and run `LaserGRBL.exe`. Windows 10 (1903+) and Windows 11 already include the runtime. If [Inno Setup](https://jrsoftware.org/isinfo.php) is installed, compile the existing `setup.iss` after that build to get `install.exe`. A GitHub Actions workflow (`.github/workflows/windows-release.yml`) produces the same zip as an artifact.
+
+The drag-knife math is covered by `LaserGRBL.Plotter.Tests` (`dotnet test`).
+
+Values assumed until measured on the machine: craft blade offset 0.50 mm, overcut 1.0 mm, lead-in 0.50 mm, cut 800 mm/min, corner arcs from 8°, knife lift only above 150°, servo S=0 up / S=255 down. Change them in the plotter dialog. Still worth confirming: the real lift method and its S or Z numbers, the measured tip offset, material and speed, whether the board has a working Z axis, the current `$32` value, and whether filled shapes should stay outline-only.
+
 All downloads available at https://github.com/arkypita/LaserGRBL/releases
 
 ### Support and Donation

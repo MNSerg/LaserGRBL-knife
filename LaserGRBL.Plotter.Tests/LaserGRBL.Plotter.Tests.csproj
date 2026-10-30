@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <LangVersion>7.3</LangVersion>
+    <RootNamespace>LaserGRBL.Plotter.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\LaserGRBL\Plotter\PlotPoint.cs" Link="Plotter\PlotPoint.cs" />
+    <Compile Include="..\LaserGRBL\Plotter\PlotterConfig.cs" Link="Plotter\PlotterConfig.cs" />
+    <Compile Include="..\LaserGRBL\Plotter\PlotGeom.cs" Link="Plotter\PlotGeom.cs" />
+    <Compile Include="..\LaserGRBL\Plotter\GCodePathReader.cs" Link="Plotter\GCodePathReader.cs" />
+    <Compile Include="..\LaserGRBL\Plotter\PathOptimizer.cs" Link="Plotter\PathOptimizer.cs" />
+    <Compile Include="..\LaserGRBL\Plotter\DragKnife.cs" Link="Plotter\DragKnife.cs" />
+    <Compile Include="..\LaserGRBL\Plotter\PlotterGCodeWriter.cs" Link="Plotter\PlotterGCodeWriter.cs" />
+    <Compile Include="..\LaserGRBL\Plotter\PlotterPipeline.cs" Link="Plotter\PlotterPipeline.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>

@@ -17,6 +17,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using LaserGRBL.SvgConverter;
 using LaserGRBL.Obj3D;
+using LaserGRBL.Plotter;
 using SharpGL.SceneGraph;
 
 namespace LaserGRBL
@@ -172,6 +173,7 @@ namespace LaserGRBL
 				converter.UseLegacyBezier = !Settings.GetObject($"Vector.UseSmartBezier", true);
 
 				string gcode = converter.convertFromFile(filename, core, filter);
+				gcode = ApplyPlotterToVectorGCode(gcode);
 				string[] lines = gcode.Split(Environment.NewLine.ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
 				foreach (string l in lines)
 				{
@@ -385,7 +387,7 @@ namespace LaserGRBL
 				flist = PotraceClipper.BuildFilling(plist, bmp.Width, bmp.Height, c);
 				flist = ParallelOptimizePaths(flist, 0 /*ComputeDirectionChangeCost(c, core, false)*/);
 			}
-			if (RasterFilling(c.dir))
+			if (RasterFilling(c.dir) && !PlotterSettings.IsEnabled)
 			{
 				using (Bitmap ptb = new Bitmap(bmp.Width, bmp.Height))
 				{
@@ -415,6 +417,15 @@ namespace LaserGRBL
 						}
 					}
 				}
+			}
+
+			if (PlotterSettings.IsEnabled)
+			{
+				EmitPlotterCurves(plist, flist, c);
+				Analyze();
+				long plotterElapsed = Tools.HiResTimer.TotalMilliseconds - start;
+				RiseOnFileLoaded(filename, plotterElapsed);
+				return;
 			}
 
 			bool supportPWM = Settings.GetObject("Support Hardware PWM", true);
@@ -1425,6 +1436,7 @@ namespace LaserGRBL
 			converter.UseLegacyBezier = !Settings.GetObject($"Vector.UseSmartBezier", true);
 
 			string gcode = converter.convertFromText(content, core);
+			gcode = ApplyPlotterToVectorGCode(gcode);
 			string[] lines = gcode.Split(Environment.NewLine.ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
 			foreach (string l in lines)
 			{
@@ -1442,6 +1454,77 @@ namespace LaserGRBL
 
 			RiseOnFileLoaded(filename, elapsed);
 
+		}
+
+		public void ApplyPlotterCompensation()
+		{
+			PlotterConfig cfg = PlotterSettings.Load();
+			List<string> snapshot = new List<string>();
+			foreach (GrblCommand cmd in list)
+			{
+				if (cmd != null && !cmd.IsEmpty)
+					snapshot.Add(cmd.Command);
+			}
+
+			SafeLoadFile(() =>
+			{
+				RiseOnFileLoading("plotter");
+				long started = Tools.HiResTimer.TotalMilliseconds;
+				ClearList();
+				mRange.ResetRange();
+				try
+				{
+					AddGeneratedLines(PlotterPipeline.Convert(snapshot, cfg));
+				}
+				catch (Exception ex)
+				{
+					Logger.LogException("Plotter", ex);
+					for (int i = 0; i < snapshot.Count; i++)
+						list.Add(new GrblCommand(snapshot[i]));
+				}
+				Analyze();
+				RiseOnFileLoaded("plotter", Tools.HiResTimer.TotalMilliseconds - started);
+			});
+		}
+
+		private string ApplyPlotterToVectorGCode(string gcode)
+		{
+			if (!PlotterSettings.IsEnabled || string.IsNullOrEmpty(gcode))
+				return gcode;
+			PlotterConfig cfg = PlotterSettings.Load();
+			int speed = Settings.GetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", cfg.CutSpeed);
+			if (speed > 0)
+				cfg.CutSpeed = speed;
+			return PlotterPipeline.Convert(gcode, cfg);
+		}
+
+		private void EmitPlotterCurves(List<List<Curve>> borders, List<List<Curve>> filling, L2LConf c)
+		{
+			PlotterConfig cfg = PlotterSettings.Load();
+			if (c.borderSpeed > 0)
+				cfg.CutSpeed = c.borderSpeed;
+			List<PlotPath> paths = new List<PlotPath>();
+			if (filling != null)
+				paths.AddRange(PotracePaths.ToPaths(filling, c.oX, c.oY, c.res));
+			if (borders != null)
+				paths.AddRange(PotracePaths.ToPaths(borders, c.oX, c.oY, c.res));
+			AddGeneratedLines(PlotterPipeline.ConvertPaths(paths, cfg));
+		}
+
+		private void AddGeneratedLines(string gcode)
+		{
+			if (string.IsNullOrEmpty(gcode))
+				return;
+			string[] lines = gcode.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+			for (int i = 0; i < lines.Length; i++)
+			{
+				string line = lines[i].Trim();
+				if (line.Length == 0)
+					continue;
+				GrblCommand cmd = new GrblCommand(line);
+				if (!cmd.IsEmpty)
+					list.Add(cmd);
+			}
 		}
 
 		private void Analyze() //analyze the file and build global range and timing for each command

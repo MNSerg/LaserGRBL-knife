@@ -196,6 +196,14 @@ namespace LaserGRBL.RasterConverter
 
 		void BtnCreateClick(object sender, EventArgs e)
 		{
+			if (Plotter.PlotterSettings.IsEnabled && (RbLineToLineTracing.Checked || RbDithering.Checked || RbNoProcessing.Checked))
+			{
+				MessageBox.Show(this, Plotter.PlotterSettingsForm.Tr(
+					"Plotter mode cuts vectors. Choose Vectorize or Centerline.",
+					"В режиме плоттера режется только вектор. Выберите векторизацию или центральную линию."));
+				return;
+			}
+
 			if (IP.SelectedTool == ImageProcessor.Tool.Vectorize && GrblFile.TimeConsumingFilling(IP.FillingDirection) && IP.FillingQuality > 2
 			&& System.Windows.Forms.MessageBox.Show(this, $"Using { GrblCore.TranslateEnum(IP.FillingDirection)} with quality > 2 line/mm could be very time consuming with big image. Continue?", "Warning",  MessageBoxButtons.OKCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.OK)
 				return;				
@@ -220,6 +228,8 @@ namespace LaserGRBL.RasterConverter
 
 					StoreSettings();
 					Project.AddSettings(GetActualSettings()); // Store project settings
+					if (Plotter.PlotterSettings.IsEnabled)
+						Plotter.PlotterSettings.RememberCutSpeed(IP.BorderSpeed);
 
 					IP.GenerateGCode(); //processo asincrono che ritorna con l'evento "OnGenerationComplete"
 				}
@@ -322,6 +332,22 @@ namespace LaserGRBL.RasterConverter
 
 			if (RbLineToLineTracing.Checked && !supportPWM)
 				RbDithering.Checked = true;
+
+			if (Plotter.PlotterSettings.IsEnabled)
+			{
+				RbLineToLineTracing.Enabled = false;
+				RbDithering.Enabled = false;
+				RbNoProcessing.Enabled = false;
+				if (RbLineToLineTracing.Checked || RbDithering.Checked || RbNoProcessing.Checked)
+					RbVectorize.Checked = true;
+				if (GrblFile.RasterFilling(IP.FillingDirection))
+				{
+					IP.FillingDirection = ImageProcessor.Direction.None;
+					CbFillingDirection.SelectedItem = ImageProcessor.Direction.None;
+				}
+				if (Text.IndexOf("Plotter", StringComparison.OrdinalIgnoreCase) < 0 && Text.IndexOf("Плоттер", StringComparison.Ordinal) < 0)
+					Text = Text + " — " + Plotter.PlotterSettingsForm.Tr("Plotter", "Плоттер");
+			}
 		}
 
         private Dictionary<string, object> GetActualSettings()

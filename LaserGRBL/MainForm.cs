@@ -31,6 +31,8 @@ namespace LaserGRBL
 		private bool PromptForWiFiShown;
 		private readonly string[] args;
 		private readonly List<ToolStripMenuItem> mLineWidthMenu;
+		private ToolStripMenuItem mApplyPlotterItem;
+		private string mBaseCaption;
 
 
         public MainForm()
@@ -103,6 +105,7 @@ namespace LaserGRBL
             nightyToolStripMenuItem.Tag = Scheme.Nighty;
 
             CheckLineWidthItem();
+			InstallPlotterMenu();
 
 			MnGrblConfig.Visible = Core.UIShowGrblConfig;
 			MnUnlock.Visible = Core.UIShowUnlockButtons;
@@ -870,6 +873,50 @@ namespace LaserGRBL
 			MnFileOpen.Enabled = Core.CanLoadNewFile;
 			MnFileAppend.Enabled = Core.CanLoadNewFile;
 			MnReOpenFile.Enabled = Core.CanReOpenFile;
+			if (mApplyPlotterItem != null)
+				mApplyPlotterItem.Enabled = Core.CanLoadNewFile && Core.LoadedFile != null && Core.LoadedFile.Count > 0;
+		}
+
+		private void InstallPlotterMenu()
+		{
+			mBaseCaption = Text;
+			ToolStripMenuItem plotterItem = new ToolStripMenuItem(Plotter.PlotterSettingsForm.Tr("Plotter...", "Плоттер..."));
+			plotterItem.Click += delegate
+			{
+				if (Plotter.PlotterSettingsForm.Edit(this))
+					RefreshPlotterCaption();
+			};
+			int settingsIndex = MnGrbl.DropDownItems.IndexOf(settingsToolStripMenuItem);
+			if (settingsIndex < 0)
+				settingsIndex = MnGrbl.DropDownItems.Count;
+			MnGrbl.DropDownItems.Insert(settingsIndex, plotterItem);
+
+			mApplyPlotterItem = new ToolStripMenuItem(Plotter.PlotterSettingsForm.Tr("Apply plotter to loaded file", "Применить плоттер к загруженному файлу"));
+			mApplyPlotterItem.Click += ApplyPlotterToLoadedFile;
+			fileToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
+			fileToolStripMenuItem.DropDownItems.Add(mApplyPlotterItem);
+			RefreshPlotterCaption();
+		}
+
+		private void RefreshPlotterCaption()
+		{
+			if (string.IsNullOrEmpty(mBaseCaption))
+				return;
+			Text = Plotter.PlotterSettings.IsEnabled ? mBaseCaption + " [Plotter]" : mBaseCaption;
+		}
+
+		private void ApplyPlotterToLoadedFile(object sender, EventArgs e)
+		{
+			if (Core == null || Core.LoadedFile == null || Core.LoadedFile.Count == 0)
+				return;
+			Plotter.PlotterConfig cfg = Plotter.PlotterSettings.Load();
+			string offset = cfg.BladeOffsetMm.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+			string question = Plotter.PlotterSettingsForm.Tr(
+				"Rebuild the loaded toolpath for the drag knife? Blade offset " + offset + " mm. Do not run this twice on the same file.",
+				"Перестроить загруженную траекторию под нож? Смещение лезвия " + offset + " мм. Не запускайте это дважды для одного и того же файла.");
+			if (MessageBox.Show(this, question, Text, MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
+				return;
+			Core.LoadedFile.ApplyPlotterCompensation();
 		}
 
 		private void MnHotkeys_Click(object sender, EventArgs e)
