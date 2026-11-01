@@ -48,6 +48,141 @@ namespace LaserGRBL.Plotter.Tests
 		}
 
 		[Fact]
+		public void Fillet_follows_the_tangent_without_steps()
+		{
+			PlotPath fillet = new PlotPath();
+			fillet.Closed = false;
+			int n = 8;
+			double radius = 40;
+			for (int i = 0; i <= n; i++)
+			{
+				double t = (Math.PI / 2) * i / n;
+				fillet.Points.Add(new PlotPoint(radius * Math.Cos(t), radius * Math.Sin(t)));
+			}
+
+			PlotterConfig cfg = Knife();
+			cfg.BladeOffsetMm = 3.6;
+			cfg.LeadInMm = 0;
+			cfg.OvercutMm = 0;
+			cfg.CornerThresholdDeg = 0;
+			List<PlotMove> moves = DragKnife.Build(new[] { fillet }, cfg);
+
+			Assert.DoesNotContain(moves, m => m.Arc);
+			double worst = MaxCutTurn(moves);
+			Assert.True(worst < 25, worst.ToString(System.Globalization.CultureInfo.InvariantCulture));
+			for (int i = 0; i < moves.Count; i++)
+			{
+				double r = Hypot(moves[i].X, moves[i].Y);
+				Assert.True(r > radius - 0.05, r.ToString(System.Globalization.CultureInfo.InvariantCulture));
+			}
+		}
+
+		[Fact]
+		public void Closed_circle_stays_on_the_offset_curve()
+		{
+			double radius = 15;
+			int n = 36;
+			PlotPath circle = new PlotPath();
+			circle.Closed = true;
+			for (int i = 0; i < n; i++)
+			{
+				double t = 2 * Math.PI * i / n;
+				circle.Points.Add(new PlotPoint(radius * Math.Cos(t), radius * Math.Sin(t)));
+			}
+
+			PlotterConfig cfg = Knife();
+			cfg.BladeOffsetMm = 3.6;
+			cfg.LeadInMm = 0;
+			cfg.OvercutMm = 0;
+			cfg.CornerThresholdDeg = 0;
+			List<PlotMove> moves = DragKnife.Build(new[] { circle }, cfg);
+
+			Assert.DoesNotContain(moves, m => m.Arc);
+			double expect = Math.Sqrt(radius * radius + 3.6 * 3.6);
+			for (int i = 0; i < moves.Count; i++)
+			{
+				double r = Hypot(moves[i].X, moves[i].Y);
+				Assert.True(Math.Abs(r - expect) < 0.2, r.ToString(System.Globalization.CultureInfo.InvariantCulture));
+			}
+			double worst = MaxCutTurn(moves);
+			Assert.True(worst < 20, worst.ToString(System.Globalization.CultureInfo.InvariantCulture));
+		}
+
+		[Fact]
+		public void Rounded_rectangle_keeps_fillets_and_swivels_nothing()
+		{
+			PlotPath shape = RoundedRect(0, 0, 50, 40, 10, 8);
+			PlotterConfig cfg = Knife();
+			cfg.BladeOffsetMm = 3.6;
+			cfg.LeadInMm = 3.6;
+			cfg.OvercutMm = 3.6;
+			cfg.CornerThresholdDeg = 8;
+			List<PlotMove> moves = DragKnife.Build(new[] { shape }, cfg);
+
+			Assert.DoesNotContain(moves, m => m.Arc);
+			double worst = MaxCutTurn(moves);
+			Assert.True(worst < 25, worst.ToString(System.Globalization.CultureInfo.InvariantCulture));
+		}
+
+		[Fact]
+		public void Idle_moves_with_blade_offset_do_not_cut_rectangles()
+		{
+			PlotterConfig cfg = PlotterConfig.CreateDefault();
+			cfg.SimplifyMm = 0;
+			cfg.MinSegmentMm = 0;
+			cfg.BladeOffsetMm = 3.6;
+			cfg.LeadInMm = 3.6;
+			cfg.OvercutMm = 3.6;
+			cfg.CornerThresholdDeg = 8;
+			cfg.OptimizeOrder = true;
+			cfg.InsideFirst = true;
+			cfg.StartMarginMm = 0;
+			cfg.LaserOffsetX = 0;
+			cfg.LaserOffsetY = 0;
+
+			List<PlotPath> walls = new List<PlotPath>();
+			for (int row = 0; row < 5; row++)
+			{
+				for (int col = 0; col < 6; col++)
+				{
+					double x = 20 + col * 36;
+					double y = 20 + row * 32;
+					walls.Add(Rect(x, y, x + 18, y + 14));
+				}
+			}
+
+			string gcode = PlotterPipeline.ConvertPaths(walls, cfg);
+			Assert.Contains("G3", gcode);
+			List<PlotPoint> motion = MotionPoints(gcode);
+			PlotPoint prev = new PlotPoint(0, 0);
+			for (int i = 0; i < motion.Count; i++)
+			{
+				for (int w = 0; w < walls.Count; w++)
+				{
+					Assert.False(
+						CutsOpenInterior(prev, motion[i], walls[w].Points),
+						prev.X + "," + prev.Y + " -> " + motion[i].X + "," + motion[i].Y);
+				}
+				prev = motion[i];
+			}
+		}
+
+		[Fact]
+		public void Short_square_still_swivels_sharp_corners()
+		{
+			PlotterConfig cfg = Knife();
+			cfg.BladeOffsetMm = 3.6;
+			cfg.LeadInMm = 0;
+			cfg.OvercutMm = 0;
+			cfg.CornerThresholdDeg = 8;
+			List<PlotMove> moves = DragKnife.Build(new[] { Rect(0, 0, 4, 4) }, cfg);
+
+			Assert.Contains(moves, m => m.Arc);
+			PlotMove arc = moves.First(m => m.Arc);
+			Assert.Equal(3.6, Hypot(arc.I, arc.J), 2);
+		}
+
+		[Fact]
 		public void Sharp_turn_lifts_the_knife()
 		{
 			PlotterConfig cfg = Knife();
@@ -445,6 +580,29 @@ M5";
 			return Rect(0, 0, 10, 10);
 		}
 
+		private static PlotPath RoundedRect(double x, double y, double width, double height, double radius, int steps)
+		{
+			PlotPath path = new PlotPath();
+			path.Closed = true;
+			AddCorner(path, x + width - radius, y + radius, radius, -Math.PI / 2, 0, steps);
+			AddCorner(path, x + width - radius, y + height - radius, radius, 0, Math.PI / 2, steps);
+			AddCorner(path, x + radius, y + height - radius, radius, Math.PI / 2, Math.PI, steps);
+			AddCorner(path, x + radius, y + radius, radius, Math.PI, Math.PI * 1.5, steps);
+			return path;
+		}
+
+		private static void AddCorner(PlotPath path, double cx, double cy, double radius, double from, double to, int steps)
+		{
+			for (int i = 0; i <= steps; i++)
+			{
+				double t = from + (to - from) * i / steps;
+				PlotPoint point = new PlotPoint(cx + radius * Math.Cos(t), cy + radius * Math.Sin(t));
+				if (path.Points.Count > 0 && PlotGeom.Dist(path.Points[path.Points.Count - 1], point) <= 0.0001)
+					continue;
+				path.Points.Add(point);
+			}
+		}
+
 		private static PlotPath Rect(double x0, double y0, double x1, double y1)
 		{
 			PlotPath path = new PlotPath();
@@ -490,6 +648,38 @@ M5";
 		private static double Hypot(double x, double y)
 		{
 			return Math.Sqrt(x * x + y * y);
+		}
+
+		private static double MaxCutTurn(List<PlotMove> moves)
+		{
+			double worst = 0;
+			PlotMove a = null;
+			PlotMove b = null;
+			for (int i = 0; i < moves.Count; i++)
+			{
+				if (!moves[i].Cut || moves[i].Arc)
+				{
+					a = null;
+					b = null;
+					continue;
+				}
+				if (a != null && b != null)
+				{
+					double h1 = Math.Atan2(b.Y - a.Y, b.X - a.X);
+					double h2 = Math.Atan2(moves[i].Y - b.Y, moves[i].X - b.X);
+					double d = h2 - h1;
+					while (d > Math.PI)
+						d -= Math.PI * 2;
+					while (d < -Math.PI)
+						d += Math.PI * 2;
+					d = Math.Abs(d * 180.0 / Math.PI);
+					if (d > worst)
+						worst = d;
+				}
+				a = b;
+				b = moves[i];
+			}
+			return worst;
 		}
 	}
 }

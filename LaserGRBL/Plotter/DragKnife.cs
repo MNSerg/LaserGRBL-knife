@@ -9,8 +9,11 @@ namespace LaserGRBL.Plotter
 	/// <summary>
 	/// Drag-knife compensation. The machine XY is the swivel axis.
 	/// The blade tip trails that axis by <see cref="PlotterConfig.BladeOffsetMm"/>.
-	/// On a corner the holder swings around the tip on an arc of that radius,
-	/// so the tip stays on the vertex while the blade turns.
+	/// Along a straight, an arc or a fillet the axis stays ahead of the tip on the
+	/// tangent, so the curve is not broken into sideways steps. A fillet is a run
+	/// of similar bends, even when each sample step is steeper than the corner
+	/// threshold. Only an isolated corner sharper than
+	/// <see cref="PlotterConfig.CornerThresholdDeg"/> swings the holder around the tip.
 	/// A lead-in aligns the blade before the design, and an overcut closes the seam.
 	/// </summary>
 	public static class DragKnife
@@ -93,8 +96,13 @@ namespace LaserGRBL.Plotter
 			double offset = cfg.BladeOffsetMm;
 			double lead = cfg.LeadInMm;
 			double over = cfg.OvercutMm;
-			PlotPoint u0 = dir[0];
-			PlotPoint holderStart = Shift(pts[0], u0, offset - lead);
+			bool[] swivel = new bool[pts.Count];
+			PlotPoint[] tangent = new PlotPoint[pts.Count];
+			Classify(pts, dir, segCount, closed, cfg, swivel, tangent);
+			PlotPoint align = tangent[0];
+			if (closed && swivel[0])
+				align = dir[0];
+			PlotPoint holderStart = Shift(pts[0], align, offset - lead);
 
 			if (cfg.PenMode == PlotterPenMode.Manual)
 			{
@@ -118,26 +126,38 @@ namespace LaserGRBL.Plotter
 				Travel(moves, holderStart);
 			}
 			if (lead > 0.0001)
-				Line(moves, Shift(pts[0], u0, offset));
-			Line(moves, Shift(Next(pts, 0, closed), u0, offset));
+				Line(moves, Shift(pts[0], align, offset));
 
-			for (int s = 1; s < segCount; s++)
+			for (int s = 0; s < segCount; s++)
 			{
-				PlotPoint corner = pts[s];
-				Corner(moves, cfg, corner, dir[s - 1], dir[s], offset, lead);
-				Line(moves, Shift(Next(pts, s, closed), dir[s], offset));
+				int vertex = (s + 1) % pts.Count;
+				bool pathEnd = !closed && s == segCount - 1;
+				PlotPoint uIn = dir[s];
+				PlotPoint uOut = pathEnd ? uIn : dir[(s + 1) % segCount];
+				double deg = pathEnd ? 0 : TurnDegrees(uIn, uOut);
+				PlotPoint end = Next(pts, s, closed);
+
+				if (!pathEnd && ShouldLift(cfg, deg))
+				{
+					Line(moves, Shift(end, uIn, offset));
+					LiftCorner(moves, cfg, end, uOut, offset, lead);
+				}
+				else if (!pathEnd && swivel[vertex])
+				{
+					Line(moves, Shift(end, uIn, offset));
+					Swivel(moves, end, uIn, uOut, offset);
+				}
+				else
+					Line(moves, Shift(end, tangent[vertex], offset));
 			}
 
-			if (closed)
+			if (closed && over > 0.0001)
 			{
-				Corner(moves, cfg, pts[0], dir[segCount - 1], dir[0], offset, lead);
-				if (over > 0.0001)
-					Line(moves, Shift(pts[0], dir[0], offset + over));
+				PlotPoint overDir = swivel[0] ? dir[0] : tangent[0];
+				Line(moves, Shift(pts[0], overDir, offset + over));
 			}
-			else if (over > 0.0001)
-			{
-				Line(moves, Shift(pts[pts.Count - 1], dir[segCount - 1], offset + over));
-			}
+			else if (!closed && over > 0.0001)
+				Line(moves, Shift(pts[pts.Count - 1], tangent[pts.Count - 1], offset + over));
 
 			if (moves.Count > 0)
 			{
@@ -153,33 +173,134 @@ namespace LaserGRBL.Plotter
 			return pts[index + 1];
 		}
 
-		private static void Corner(List<PlotMove> moves, PlotterConfig cfg, PlotPoint corner, PlotPoint uIn, PlotPoint uOut, double offset, double lead)
+		private static void Classify(List<PlotPoint> pts, PlotPoint[] dir, int segCount, bool closed, PlotterConfig cfg, bool[] swivel, PlotPoint[] tangent)
 		{
-			double delta = PlotGeom.DeltaAngle(PlotGeom.Heading(uIn), PlotGeom.Heading(uOut));
-			double deg = Math.Abs(delta * 180.0 / Math.PI);
+			int count = pts.Count;
+			double[] deg = new double[count];
+			int[] sign = new int[count];
+			int corners = closed ? count : count - 2;
+			for (int c = 0; c < corners; c++)
+			{
+				int vertex = closed ? c : c + 1;
+				int inSeg = closed ? (vertex - 1 + segCount) % segCount : vertex - 1;
+				int outSeg = vertex % segCount;
+				double delta = PlotGeom.DeltaAngle(PlotGeom.Heading(dir[inSeg]), PlotGeom.Heading(dir[outSeg]));
+				deg[vertex] = Math.Abs(delta * 180.0 / Math.PI);
+				if (delta > 1e-9)
+					sign[vertex] = 1;
+				else if (delta < -1e-9)
+					sign[vertex] = -1;
+				tangent[vertex] = Bisector(dir[inSeg], dir[outSeg]);
+			}
+
+			if (!closed)
+			{
+				tangent[0] = dir[0];
+				tangent[count - 1] = dir[segCount - 1];
+			}
+
+			// A fillet or arc is a run of similar bends. The sampler can leave
+			// each step steeper than the corner threshold and longer than the
+			// blade offset; that is still a curve. A square or hexagon is one
+			// large kink between sides, so it still swivels.
+			double shortSide = cfg.BladeOffsetMm * 1.25;
+			if (shortSide < 1)
+				shortSide = 1;
+			bool[] curve = new bool[count];
+			if (cfg.BladeOffsetMm > 0.0001 && corners > 0)
+			{
+				for (int c = 0; c < corners; c++)
+				{
+					int vertex = closed ? c : c + 1;
+					int next = closed ? (vertex + 1) % count : vertex + 1;
+					if (!closed && next > count - 2)
+						continue;
+					if (Continues(pts, vertex, next, deg, sign, shortSide))
+					{
+						curve[vertex] = true;
+						curve[next] = true;
+					}
+				}
+
+				double threshold = cfg.CornerThresholdDeg;
+				for (int c = 0; c < corners; c++)
+				{
+					int vertex = closed ? c : c + 1;
+					if (!curve[vertex] && deg[vertex] >= threshold)
+						swivel[vertex] = true;
+				}
+			}
+
+			if (!closed && count >= 3 && curve[1] && SameChord(pts, 0, 1, 2))
+				tangent[0] = EndpointTangent(dir[0], deg[1], sign[1], false);
+			if (!closed && count >= 3 && curve[count - 2] && SameChord(pts, count - 3, count - 2, count - 1))
+				tangent[count - 1] = EndpointTangent(dir[segCount - 1], deg[count - 2], sign[count - 2], true);
+		}
+
+		private static bool Continues(List<PlotPoint> pts, int vertex, int next, double[] deg, int[] sign, double shortSide)
+		{
+			if (sign[vertex] == 0 || sign[vertex] != sign[next])
+				return false;
+			if (deg[vertex] < 2 || deg[next] < 2)
+				return false;
+			if (deg[vertex] > 40 || deg[next] > 40)
+				return false;
+			double smaller = deg[vertex] < deg[next] ? deg[vertex] : deg[next];
+			double larger = deg[vertex] > deg[next] ? deg[vertex] : deg[next];
+			if (smaller < larger * 0.5)
+				return false;
+			if (larger <= 20)
+				return true;
+			return PlotGeom.Dist(pts[vertex], pts[next]) <= shortSide;
+		}
+
+		private static bool SameChord(List<PlotPoint> pts, int a, int b, int c)
+		{
+			double left = PlotGeom.Dist(pts[a], pts[b]);
+			double right = PlotGeom.Dist(pts[b], pts[c]);
+			if (left <= 0.0001 || right <= 0.0001)
+				return false;
+			return left <= right * 1.5 && right <= left * 1.5;
+		}
+
+		private static PlotPoint EndpointTangent(PlotPoint chord, double turnDeg, int sign, bool incoming)
+		{
+			if (turnDeg < 2 || sign == 0)
+				return chord;
+			double half = turnDeg * 0.5 * Math.PI / 180.0;
+			double rot = incoming ? sign * half : -sign * half;
+			return Rotate(chord, rot);
+		}
+
+		private static PlotPoint Rotate(PlotPoint v, double radians)
+		{
+			double c = Math.Cos(radians);
+			double s = Math.Sin(radians);
+			return new PlotPoint(v.X * c - v.Y * s, v.X * s + v.Y * c);
+		}
+
+		private static bool ShouldLift(PlotterConfig cfg, double deg)
+		{
+			if (cfg.PenMode == PlotterPenMode.Manual)
+				return false;
+			return cfg.LiftAngleDeg > 0 && deg >= cfg.LiftAngleDeg;
+		}
+
+		private static void LiftCorner(List<PlotMove> moves, PlotterConfig cfg, PlotPoint corner, PlotPoint uOut, double offset, double lead)
+		{
+			double align = lead > 0 ? lead : offset;
+			Travel(moves, Shift(corner, uOut, offset - align));
+			if (align > 0.0001)
+				Line(moves, Shift(corner, uOut, offset));
+		}
+
+		private static void Swivel(List<PlotMove> moves, PlotPoint corner, PlotPoint uIn, PlotPoint uOut, double offset)
+		{
 			PlotPoint from = Shift(corner, uIn, offset);
 			PlotPoint to = Shift(corner, uOut, offset);
-
-			double liftAngle = cfg.PenMode == PlotterPenMode.Manual ? 0 : cfg.LiftAngleDeg;
-			if (liftAngle > 0 && deg >= liftAngle)
-			{
-				double align = lead > 0 ? lead : offset;
-				Travel(moves, Shift(corner, uOut, offset - align));
-				if (align > 0.0001)
-					Line(moves, to);
-				return;
-			}
-
-			if (offset <= 0.0001 || deg < cfg.CornerThresholdDeg)
-			{
-				if (PlotGeom.Dist(from, to) > 0.0001)
-					Line(moves, to);
-				return;
-			}
-
 			if (PlotGeom.Dist(from, to) <= 0.0001)
 				return;
-
+			double delta = PlotGeom.DeltaAngle(PlotGeom.Heading(uIn), PlotGeom.Heading(uOut));
 			PlotMove arc = new PlotMove();
 			arc.Cut = true;
 			arc.Arc = true;
@@ -189,6 +310,21 @@ namespace LaserGRBL.Plotter
 			arc.I = corner.X - from.X;
 			arc.J = corner.Y - from.Y;
 			moves.Add(arc);
+		}
+
+		private static double TurnDegrees(PlotPoint uIn, PlotPoint uOut)
+		{
+			double delta = PlotGeom.DeltaAngle(PlotGeom.Heading(uIn), PlotGeom.Heading(uOut));
+			return Math.Abs(delta * 180.0 / Math.PI);
+		}
+
+		private static PlotPoint Bisector(PlotPoint u, PlotPoint v)
+		{
+			PlotPoint sum = new PlotPoint(u.X + v.X, u.Y + v.Y);
+			PlotPoint tangent = PlotGeom.Normalize(sum);
+			if (tangent.X == 0 && tangent.Y == 0)
+				return v;
+			return tangent;
 		}
 
 		private static PlotPoint Shift(PlotPoint point, PlotPoint unit, double distance)
