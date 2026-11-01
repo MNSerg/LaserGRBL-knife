@@ -141,9 +141,13 @@ namespace LaserGRBL.Plotter
 			double height = maxY - minY;
 			if (width < 1) width = 1;
 			if (height < 1) height = 1;
-			double cell = margin;
-			if (cell < 0.8)
-				cell = 0.8;
+			// Cell size follows the gaps, not the clearance. A coarse cell closes
+			// a narrow corridor and the search then gives up with a straight cut.
+			double cell = 1.0;
+			if (margin > 0 && margin < cell)
+				cell = margin;
+			if (cell < 0.5)
+				cell = 0.5;
 			int nx = (int)Math.Ceiling(width / cell) + 1;
 			int ny = (int)Math.Ceiling(height / cell) + 1;
 			const int cap = 200;
@@ -421,16 +425,6 @@ namespace LaserGRBL.Plotter
 			double maxX = double.MinValue;
 			double maxY = double.MinValue;
 			bool any = false;
-			int closed = 0;
-			for (int i = 0; i < obstacles.Count; i++)
-			{
-				PlotPath path = obstacles[i];
-				if (path == null || !path.Closed || path.Points == null || path.Points.Count < 3)
-					continue;
-				closed++;
-			}
-
-			bool perShape = closed > 0 && closed <= 24;
 			for (int i = 0; i < obstacles.Count; i++)
 			{
 				PlotPath path = obstacles[i];
@@ -443,11 +437,36 @@ namespace LaserGRBL.Plotter
 				if (x1 > maxX) maxX = x1;
 				if (y1 > maxY) maxY = y1;
 				any = true;
-				if (perShape)
-					AddBox(nodes, x0 - margin, y0 - margin, x1 + margin, y1 + margin);
 			}
+			// A small pad keeps the corner in the gap. Padding by the full
+			// clearance shuts a gap that is narrower than twice that clearance.
+			double pad = 0.4;
+			if (margin > 0 && margin < pad)
+				pad = margin;
+			double outer = margin;
+			if (outer < 1)
+				outer = 1;
+			if (outer > 6)
+				outer = 6;
 			if (any)
-				AddBox(nodes, minX - margin, minY - margin, maxX + margin, maxY + margin);
+				AddBox(nodes, minX - outer, minY - outer, maxX + outer, maxY + outer);
+			for (int i = 0; i < obstacles.Count; i++)
+			{
+				PlotPath path = obstacles[i];
+				if (path == null || !path.Closed || path.Points == null || path.Points.Count < 3)
+					continue;
+				double x0, y0, x1, y1;
+				Bounds(path.Points, out x0, out y0, out x1, out y1);
+				AddCorner(nodes, x0 - pad, y0 - pad);
+				AddCorner(nodes, x1 + pad, y0 - pad);
+				AddCorner(nodes, x1 + pad, y1 + pad);
+				AddCorner(nodes, x0 - pad, y1 + pad);
+			}
+		}
+
+		private static void AddCorner(List<PlotPoint> nodes, double x, double y)
+		{
+			AddNode(nodes, new PlotPoint(x, y));
 		}
 
 		private static void AddBox(List<PlotPoint> nodes, double x0, double y0, double x1, double y1)
@@ -469,7 +488,7 @@ namespace LaserGRBL.Plotter
 				if (PlotGeom.Dist(nodes[i], p) < 0.05)
 					return;
 			}
-			if (nodes.Count >= 160)
+			if (nodes.Count >= 480)
 				return;
 			nodes.Add(p);
 		}

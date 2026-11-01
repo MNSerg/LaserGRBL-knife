@@ -25,6 +25,19 @@ namespace LaserGRBL.Plotter
 		Rubber = 5
 	}
 
+	/// <summary>Which closed contour the knife walks to next. Travel still goes around other contours.</summary>
+	public enum PlotterRouteMode
+	{
+		/// <summary>Closest contour that can be reached without crossing another.</summary>
+		Nearest = 0,
+		/// <summary>Contours on the outer edge of the sheet first, then deeper toward the middle.</summary>
+		OutsideIn = 1,
+		/// <summary>A nested contour before the outline around it, when the knife can already reach it.</summary>
+		InsideOut = 2,
+		/// <summary>Leave the file order. Each contour is still entered from the outside.</summary>
+		FileOrder = 3
+	}
+
 	/// <summary>
 	/// Cutter parameters for a drag knife (passive swivel blade) or a pen.
 	/// Distances are millimetres, speeds are millimetres per minute, angles are degrees.
@@ -53,6 +66,7 @@ namespace LaserGRBL.Plotter
 		public double PenDownZ;
 		public bool OptimizeOrder;
 		public bool InsideFirst;
+		public PlotterRouteMode RouteMode;
 		public int Passes;
 		public bool LinearizeArcs;
 		public double ArcStepDeg;
@@ -86,7 +100,8 @@ namespace LaserGRBL.Plotter
 			c.PenUpZ = 5;
 			c.PenDownZ = 0;
 			c.OptimizeOrder = true;
-			c.InsideFirst = true;
+			c.InsideFirst = false;
+			c.RouteMode = PlotterRouteMode.Nearest;
 			c.Passes = 1;
 			c.LinearizeArcs = false;
 			c.ArcStepDeg = 10;
@@ -177,6 +192,10 @@ namespace LaserGRBL.Plotter
 			if (LaserOffsetY < -500) LaserOffsetY = -500;
 			if (LaserOffsetY > 500) LaserOffsetY = 500;
 			if (string.IsNullOrEmpty(BladeName)) BladeName = "Blade";
+			int route = (int)RouteMode;
+			if (route < 0 || route > 3) RouteMode = PlotterRouteMode.Nearest;
+			OptimizeOrder = RouteMode != PlotterRouteMode.FileOrder;
+			InsideFirst = RouteMode == PlotterRouteMode.InsideOut;
 		}
 	}
 }

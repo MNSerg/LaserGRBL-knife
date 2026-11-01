@@ -7,8 +7,10 @@ using System.Collections.Generic;
 namespace LaserGRBL.Plotter
 {
 	/// <summary>
-	/// Cleans vector paths and orders them for a drag knife:
-	/// inner contours before the outline that contains them, then a short pen-up travel.
+	/// Cleans vector paths and chooses which contour is next.
+	/// With the knife down, a contour that can be reached without crossing
+	/// another closed contour is always preferred. The route mode only decides
+	/// which of those reachable contours comes first.
 	/// </summary>
 	public static class PathOptimizer
 	{
@@ -35,13 +37,18 @@ namespace LaserGRBL.Plotter
 			if (cfg.PenMode == PlotterPenMode.Manual)
 				return OrderKnifeDown(clean, cfg, start);
 
-			if (clean.Count <= 1 || (!cfg.OptimizeOrder && !cfg.InsideFirst))
+			if (clean.Count <= 1 || cfg.RouteMode == PlotterRouteMode.FileOrder)
 				return clean;
 
-			int[] depth = new int[clean.Count];
-			if (cfg.InsideFirst)
-				depth = ComputeDepth(clean);
+			if (cfg.RouteMode == PlotterRouteMode.InsideOut)
+				return OrderByDepth(clean, start);
 
+			return OrderPenUp(clean, cfg, start);
+		}
+
+		private static List<PlotPath> OrderByDepth(List<PlotPath> clean, PlotPoint start)
+		{
+			int[] depth = ComputeDepth(clean);
 			int maxDepth = 0;
 			for (int i = 0; i < depth.Length; i++)
 			{
@@ -61,17 +68,55 @@ namespace LaserGRBL.Plotter
 					if (depth[i] == d)
 						bucket.Add(i);
 				}
-				if (cfg.OptimizeOrder)
-					TakeNearest(clean, bucket, ordered, ref cursor, ref heading, ref haveHeading);
-				else
+				TakeNearest(clean, bucket, ordered, ref cursor, ref heading, ref haveHeading);
+			}
+			return ordered;
+		}
+
+		private static List<PlotPath> OrderPenUp(List<PlotPath> clean, PlotterConfig cfg, PlotPoint start)
+		{
+			double[] inward = null;
+			if (cfg.RouteMode == PlotterRouteMode.OutsideIn)
+				inward = MeasureInward(clean);
+			List<int> left = new List<int>();
+			for (int i = 0; i < clean.Count; i++)
+				left.Add(i);
+
+			List<PlotPath> ordered = new List<PlotPath>();
+			PlotPoint cursor = start;
+			double heading = 0;
+			bool haveHeading = false;
+			while (left.Count > 0)
+			{
+				int pick = 0;
+				PlotPath bestPath = null;
+				double bestScore = double.MaxValue;
+				double bestHeading = heading;
+				PlotPoint bestEnd = cursor;
+				for (int s = 0; s < left.Count; s++)
 				{
-					for (int i = 0; i < bucket.Count; i++)
+					int index = left[s];
+					PlotPoint end;
+					double exitHeading;
+					double cost;
+					PlotPath oriented = BestOrientation(clean[index], cursor, heading, haveHeading, out cost, out end, out exitHeading);
+					double score = cost;
+					if (inward != null)
+						score = inward[index] * 100000.0 + cost;
+					if (score < bestScore)
 					{
-						PlotPath path = clean[bucket[i]];
-						ordered.Add(path);
-						cursor = path.Points[path.Points.Count - 1];
+						bestScore = score;
+						pick = s;
+						bestPath = oriented;
+						bestEnd = end;
+						bestHeading = exitHeading;
 					}
 				}
+				ordered.Add(bestPath);
+				cursor = bestEnd;
+				heading = bestHeading;
+				haveHeading = true;
+				left.RemoveAt(pick);
 			}
 			return ordered;
 		}
@@ -88,8 +133,12 @@ namespace LaserGRBL.Plotter
 			if (clean.Count == 0)
 				return ordered;
 
-			int[] depth = new int[clean.Count];
-			if (cfg.InsideFirst)
+			PlotterRouteMode mode = cfg.RouteMode;
+			double[] inward = null;
+			int[] depth = null;
+			if (mode == PlotterRouteMode.OutsideIn)
+				inward = MeasureInward(clean);
+			if (mode == PlotterRouteMode.InsideOut)
 				depth = ComputeDepth(clean);
 
 			List<int> left = new List<int>();
@@ -99,32 +148,34 @@ namespace LaserGRBL.Plotter
 			PlotPoint cursor = start;
 			double heading = 0;
 			bool haveHeading = false;
-			bool reorder = cfg.OptimizeOrder && clean.Count > 1;
 
 			while (left.Count > 0)
 			{
 				int pick = 0;
-				if (reorder || cfg.InsideFirst)
+				if (mode != PlotterRouteMode.FileOrder)
 				{
 					double bestScore = double.MaxValue;
+					bool anyClear = false;
+					double[] costs = new double[left.Count];
 					for (int s = 0; s < left.Count; s++)
 					{
-						if (!reorder && s > 0 && !cfg.InsideFirst)
-							break;
-						PlotPath oriented;
 						double cost;
 						PlotPoint end;
 						double exitHeading;
-						oriented = BestKnifeOrientation(clean[left[s]], cursor, heading, haveHeading, clean, cfg, out cost, out end, out exitHeading);
-						double score = cost;
-						if (cfg.InsideFirst && cost < 1e8)
-							score -= depth[left[s]] * 100000.0;
-						if (!reorder && cfg.InsideFirst)
-						{
-							// Keep the original order inside a depth, but still
-							// finish every reachable deeper contour first.
-							score = (cost < 1e8 ? -depth[left[s]] * 100000.0 : 1e9) + s;
-						}
+						BestKnifeOrientation(clean[left[s]], cursor, heading, haveHeading, clean, cfg, out cost, out end, out exitHeading);
+						costs[s] = cost;
+						if (cost < 1e8)
+							anyClear = true;
+					}
+					for (int s = 0; s < left.Count; s++)
+					{
+						if (anyClear && costs[s] >= 1e8)
+							continue;
+						double score = costs[s];
+						if (mode == PlotterRouteMode.OutsideIn)
+							score = inward[left[s]] * 100000.0 + costs[s];
+						else if (mode == PlotterRouteMode.InsideOut)
+							score = -depth[left[s]] * 100000.0 + costs[s];
 						if (score < bestScore)
 						{
 							bestScore = score;
@@ -145,6 +196,52 @@ namespace LaserGRBL.Plotter
 				left.RemoveAt(pick);
 			}
 			return ordered;
+		}
+
+		private static double[] MeasureInward(List<PlotPath> paths)
+		{
+			double minX = double.MaxValue;
+			double minY = double.MaxValue;
+			double maxX = double.MinValue;
+			double maxY = double.MinValue;
+			for (int i = 0; i < paths.Count; i++)
+			{
+				List<PlotPoint> pts = paths[i].Points;
+				for (int p = 0; p < pts.Count; p++)
+				{
+					if (pts[p].X < minX) minX = pts[p].X;
+					if (pts[p].Y < minY) minY = pts[p].Y;
+					if (pts[p].X > maxX) maxX = pts[p].X;
+					if (pts[p].Y > maxY) maxY = pts[p].Y;
+				}
+			}
+
+			double[] inward = new double[paths.Count];
+			for (int i = 0; i < paths.Count; i++)
+			{
+				List<PlotPoint> pts = paths[i].Points;
+				double x0 = pts[0].X;
+				double y0 = pts[0].Y;
+				double x1 = x0;
+				double y1 = y0;
+				for (int p = 1; p < pts.Count; p++)
+				{
+					if (pts[p].X < x0) x0 = pts[p].X;
+					if (pts[p].Y < y0) y0 = pts[p].Y;
+					if (pts[p].X > x1) x1 = pts[p].X;
+					if (pts[p].Y > y1) y1 = pts[p].Y;
+				}
+				double d = x0 - minX;
+				double right = maxX - x1;
+				double bottom = y0 - minY;
+				double top = maxY - y1;
+				if (right < d) d = right;
+				if (bottom < d) d = bottom;
+				if (top < d) d = top;
+				if (d < 0) d = 0;
+				inward[i] = d;
+			}
+			return inward;
 		}
 
 		private static PlotPath BestKnifeOrientation(PlotPath path, PlotPoint cursor, double heading, bool haveHeading, IList<PlotPath> obstacles, PlotterConfig cfg, out double cost, out PlotPoint end, out double exitHeading)

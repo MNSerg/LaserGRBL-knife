@@ -48,6 +48,17 @@ namespace LaserGRBL.Plotter
 			cfg.PenDownZ = LaserGRBL.Settings.GetObject("Plotter.PenDownZ", def.PenDownZ);
 			cfg.OptimizeOrder = LaserGRBL.Settings.GetObject("Plotter.OptimizeOrder", def.OptimizeOrder);
 			cfg.InsideFirst = LaserGRBL.Settings.GetObject("Plotter.InsideFirst", def.InsideFirst);
+			int routeStored = LaserGRBL.Settings.GetObject("Plotter.RouteMode", -1);
+			if (routeStored < 0 || routeStored > 3)
+			{
+				if (!cfg.OptimizeOrder)
+					cfg.RouteMode = PlotterRouteMode.FileOrder;
+				else
+					cfg.RouteMode = PlotterRouteMode.Nearest;
+				LaserGRBL.Settings.SetObject("Plotter.RouteMode", (int)cfg.RouteMode);
+			}
+			else
+				cfg.RouteMode = (PlotterRouteMode)routeStored;
 			cfg.Passes = LaserGRBL.Settings.GetObject("Plotter.Passes", def.Passes);
 			cfg.LinearizeArcs = LaserGRBL.Settings.GetObject("Plotter.LinearizeArcs", def.LinearizeArcs);
 			cfg.ArcStepDeg = LaserGRBL.Settings.GetObject("Plotter.ArcStepDeg", def.ArcStepDeg);
@@ -83,8 +94,9 @@ namespace LaserGRBL.Plotter
 			LaserGRBL.Settings.SetObject("Plotter.ServoDown", cfg.ServoDown);
 			LaserGRBL.Settings.SetObject("Plotter.PenUpZ", cfg.PenUpZ);
 			LaserGRBL.Settings.SetObject("Plotter.PenDownZ", cfg.PenDownZ);
-			LaserGRBL.Settings.SetObject("Plotter.OptimizeOrder", cfg.OptimizeOrder);
-			LaserGRBL.Settings.SetObject("Plotter.InsideFirst", cfg.InsideFirst);
+			LaserGRBL.Settings.SetObject("Plotter.RouteMode", (int)cfg.RouteMode);
+			LaserGRBL.Settings.SetObject("Plotter.OptimizeOrder", cfg.RouteMode != PlotterRouteMode.FileOrder);
+			LaserGRBL.Settings.SetObject("Plotter.InsideFirst", cfg.RouteMode == PlotterRouteMode.InsideOut);
 			LaserGRBL.Settings.SetObject("Plotter.Passes", cfg.Passes);
 			LaserGRBL.Settings.SetObject("Plotter.LinearizeArcs", cfg.LinearizeArcs);
 			LaserGRBL.Settings.SetObject("Plotter.ArcStepDeg", cfg.ArcStepDeg);

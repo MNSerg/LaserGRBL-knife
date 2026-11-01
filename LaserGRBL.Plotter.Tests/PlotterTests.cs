@@ -229,13 +229,119 @@ M5";
 		}
 
 		[Fact]
+		public void Narrow_gaps_are_not_cut_when_the_knife_changes_contour()
+		{
+			PlotterConfig cfg = PlotterConfig.CreateDefault();
+			cfg.SimplifyMm = 0;
+			cfg.MinSegmentMm = 0;
+			cfg.BladeOffsetMm = 3.6;
+			cfg.LeadInMm = 3.6;
+			cfg.OvercutMm = 3.6;
+			cfg.CornerThresholdDeg = 8;
+			cfg.RouteMode = PlotterRouteMode.Nearest;
+			cfg.StartMarginMm = 0;
+			cfg.LaserOffsetX = 0;
+			cfg.LaserOffsetY = 0;
+
+			List<PlotPath> walls = new List<PlotPath>();
+			for (int row = 0; row < 4; row++)
+			{
+				for (int col = 0; col < 5; col++)
+				{
+					double x = 20 + col * 16;
+					double y = 20 + row * 14;
+					walls.Add(Rect(x, y, x + 12, y + 10));
+				}
+			}
+
+			string gcode = PlotterPipeline.ConvertPaths(walls, cfg);
+			List<PlotPoint> motion = MotionPoints(gcode);
+			PlotPoint prev = new PlotPoint(0, 0);
+			for (int i = 0; i < motion.Count; i++)
+			{
+				for (int w = 0; w < walls.Count; w++)
+				{
+					Assert.False(
+						CutsOpenInterior(prev, motion[i], walls[w].Points),
+						prev.X + "," + prev.Y + " -> " + motion[i].X + "," + motion[i].Y);
+				}
+				prev = motion[i];
+			}
+		}
+
+		[Fact]
+		public void Outside_in_starts_at_the_sheet_edge()
+		{
+			PlotPath left = Rect(0, 0, 10, 40);
+			PlotPath right = Rect(90, 0, 100, 40);
+			PlotPath center = Rect(45, 18, 55, 28);
+			PlotterConfig cfg = Knife();
+			cfg.BladeOffsetMm = 0;
+			cfg.LeadInMm = 0;
+			cfg.OvercutMm = 0;
+			cfg.PenMode = PlotterPenMode.Manual;
+			cfg.RouteMode = PlotterRouteMode.OutsideIn;
+
+			List<PlotPath> ordered = PathOptimizer.Prepare(new[] { center, left, right }, cfg, new PlotPoint(50, 2));
+			double first = ordered[0].Points.Min(p => p.X);
+			Assert.True(first < 15 || first > 85, first.ToString(System.Globalization.CultureInfo.InvariantCulture));
+		}
+
+		[Fact]
+		public void Nearest_starts_at_the_closest_contour()
+		{
+			PlotPath left = Rect(0, 0, 10, 40);
+			PlotPath right = Rect(90, 0, 100, 40);
+			PlotPath center = Rect(45, 18, 55, 28);
+			PlotterConfig cfg = Knife();
+			cfg.BladeOffsetMm = 0;
+			cfg.LeadInMm = 0;
+			cfg.OvercutMm = 0;
+			cfg.PenMode = PlotterPenMode.Manual;
+			cfg.RouteMode = PlotterRouteMode.Nearest;
+
+			List<PlotPath> ordered = PathOptimizer.Prepare(new[] { center, left, right }, cfg, new PlotPoint(50, 2));
+			double first = ordered[0].Points.Min(p => p.X);
+			Assert.InRange(first, 40, 60);
+		}
+
+		[Fact]
+		public void Route_threads_narrow_gaps_between_many_rectangles()
+		{
+			List<PlotPath> walls = new List<PlotPath>();
+			for (int row = 0; row < 5; row++)
+			{
+				for (int col = 0; col < 6; col++)
+				{
+					double x = 12 + col * 14;
+					double y = 12 + row * 12;
+					walls.Add(Rect(x, y, x + 12, y + 10));
+				}
+			}
+
+			PlotPoint from = new PlotPoint(0, 0);
+			PlotPoint to = new PlotPoint(12 + 3 * 14, 12 + 2 * 12);
+			List<PlotPoint> route = SafeRoute.Route(from, to, walls, 3.6);
+			Assert.True(PlotGeom.Dist(route[route.Count - 1], to) < 0.05);
+
+			PlotPoint prev = from;
+			for (int i = 0; i < route.Count; i++)
+			{
+				for (int w = 0; w < walls.Count; w++)
+					Assert.False(PlotGeom.SegmentThroughInterior(prev, route[i], walls[w].Points),
+						prev.X + "," + prev.Y + " -> " + route[i].X + "," + route[i].Y);
+				prev = route[i];
+			}
+		}
+
+		[Fact]
 		public void Inner_contour_is_cut_before_the_outline()
 		{
 			PlotPath outer = Rect(0, 0, 100, 100);
 			PlotPath inner = Rect(40, 40, 60, 60);
 			PlotterConfig cfg = Knife();
-			cfg.OptimizeOrder = true;
-			cfg.InsideFirst = true;
+			cfg.RouteMode = PlotterRouteMode.InsideOut;
+			cfg.PenMode = PlotterPenMode.ServoPwm;
 			List<PlotPath> ordered = PathOptimizer.Prepare(new[] { outer, inner }, cfg);
 
 			Assert.Equal(2, ordered.Count);

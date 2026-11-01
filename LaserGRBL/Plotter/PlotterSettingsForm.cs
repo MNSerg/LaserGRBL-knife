@@ -10,6 +10,7 @@ namespace LaserGRBL.Plotter
 {
 	public sealed class PlotterSettingsForm : Form
 	{
+		private readonly ToolTip mTip;
 		private readonly CheckBox mEnabled;
 		private readonly ComboBox mPreset;
 		private readonly TextBox mName;
@@ -31,8 +32,7 @@ namespace LaserGRBL.Plotter
 		private readonly NumericUpDown mServoDown;
 		private readonly NumericUpDown mZUp;
 		private readonly NumericUpDown mZDown;
-		private readonly CheckBox mOrder;
-		private readonly CheckBox mInside;
+		private readonly ComboBox mRoute;
 		private readonly CheckBox mLinearize;
 		private readonly NumericUpDown mMargin;
 		private readonly NumericUpDown mLaserX;
@@ -54,15 +54,15 @@ namespace LaserGRBL.Plotter
 
 		public PlotterSettingsForm()
 		{
-			Text = Tr("Plotter / drag knife", "Плоттер / нож с пассивным поворотом");
+			Text = Tr("Plotter / drag knife", "Плоттер / нож");
 			StartPosition = FormStartPosition.CenterParent;
 			FormBorderStyle = FormBorderStyle.FixedDialog;
 			MaximizeBox = false;
 			MinimizeBox = false;
 			ShowInTaskbar = false;
 			AutoScaleMode = AutoScaleMode.Font;
-			ClientSize = new Size(720, 900);
 			Font = SystemFonts.MessageBoxFont;
+			ClientSize = new Size(620, 640);
 			try
 			{
 				BackColor = LaserGRBL.ColorScheme.FormBackColor;
@@ -70,89 +70,172 @@ namespace LaserGRBL.Plotter
 			}
 			catch { }
 
+			mTip = new ToolTip();
+			mTip.AutoPopDelay = 14000;
+			mTip.InitialDelay = 350;
+			mTip.ReshowDelay = 200;
+			mTip.ShowAlways = true;
+
 			TableLayoutPanel table = new TableLayoutPanel();
 			table.Dock = DockStyle.Fill;
-			table.Padding = new Padding(10, 8, 10, 8);
-			table.AutoScroll = true;
-			table.ColumnCount = 2;
-			table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
-			table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
+			table.Padding = new Padding(12, 8, 12, 4);
+			table.ColumnCount = 4;
+			table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 148));
+			table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+			table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 148));
+			table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
 			Controls.Add(table);
 
 			mEnabled = new CheckBox();
-			mEnabled.Text = Tr("Plotter mode when importing images, SVG and DXF", "Режим плоттера при импорте изображений, SVG и DXF");
+			mEnabled.Text = Tr("Use plotter mode for images, SVG and DXF", "Режим плоттера для картинок, SVG и DXF");
 			mEnabled.AutoSize = true;
-			mEnabled.Margin = new Padding(3, 6, 3, 8);
+			mEnabled.Anchor = AnchorStyles.Left;
+			mEnabled.Margin = new Padding(0, 4, 0, 2);
+			AddRow(table, 28);
 			table.Controls.Add(mEnabled, 0, 0);
-			table.SetColumnSpan(mEnabled, 2);
+			table.SetColumnSpan(mEnabled, 4);
+			mTip.SetToolTip(mEnabled, Tr(
+				"When this is on, importing an image, SVG or DXF builds a drag-knife path. Apply plotter to a file that is already open from the File menu, once.",
+				"Включено — импорт картинки, SVG или DXF сразу строит путь ножа. Уже открытый файл обрабатывается один раз из меню «Файл»."));
 
-			mPreset = AddCombo(table, Tr("Blade preset", "Пресет лезвия"));
-			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Rubber, Tr("Rubber blade 3.60 mm", "Резина, лезвие 3,60 мм")));
-			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Pen, Tr("Pen (no offset)", "Перо (без смещения)")));
-			mPreset.Items.Add(new PresetItem(PlotterBladePreset.VinylFine, Tr("Vinyl blade 0.25 mm", "Винил 0.25 мм")));
-			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Craft, Tr("Craft blade 0.50 mm", "Канцелярское 0.50 мм")));
-			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Deep, Tr("Deep blade 0.75 mm", "Глубокое 0.75 мм")));
+			Section(table, Tr("Blade", "Лезвие"));
+			mPreset = PlaceCombo(table, Tr("Preset", "Пресет"), Tr(
+				"Fills offset, overcut and lead-in. Editing those three switches the preset to Custom.",
+				"Подставляет смещение, перерез и заход. Если поменять эти три числа, пресет станет «Своё»."));
+			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Rubber, Tr("Rubber 3.60 mm", "Резина 3,60 мм")));
+			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Pen, Tr("Pen, no offset", "Перо, без смещения")));
+			mPreset.Items.Add(new PresetItem(PlotterBladePreset.VinylFine, Tr("Vinyl 0.25 mm", "Винил 0,25 мм")));
+			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Craft, Tr("Craft 0.50 mm", "Канцелярское 0,50 мм")));
+			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Deep, Tr("Deep 0.75 mm", "Глубокое 0,75 мм")));
 			mPreset.Items.Add(new PresetItem(PlotterBladePreset.Custom, Tr("Custom", "Своё")));
 			mPreset.SelectedIndexChanged += PresetChanged;
 
-			mName = AddText(table, Tr("Blade name", "Имя лезвия"));
-			mOffset = AddNum(table, Tr("Blade offset, mm", "Смещение лезвия, мм"), 0, 20, 2, 0.05m);
-			mOvercut = AddNum(table, Tr("Overcut, mm", "Перерез (overcut), мм"), 0, 50, 2, 0.1m);
-			mLeadIn = AddNum(table, Tr("Lead-in, mm", "Заход для разворота, мм"), 0, 50, 2, 0.1m);
-			mCorner = AddNum(table, Tr("Sharp corner from, deg", "Острый угол от, град"), 0, 180, 0, 1);
-			mLift = AddNum(table, Tr("Lift knife above, deg (0 = never)", "Поднимать нож свыше, град (0 = никогда)"), 0, 180, 0, 1);
-			mSimplify = AddNum(table, Tr("Simplify tolerance, mm", "Упрощение пути, мм"), 0, 5, 2, 0.01m);
-			mMinSeg = AddNum(table, Tr("Minimum segment, mm", "Мин. отрезок, мм"), 0, 5, 2, 0.01m);
-			mPasses = AddNum(table, Tr("Passes", "Проходы"), 1, 30, 0, 1);
+			mName = PlaceText(table, 0, Tr("Name", "Имя"), Tr(
+				"Comment in the G-code only. It does not change the path.",
+				"Только комментарий в G-коде. На путь не влияет."));
+			mPasses = PlaceNum(table, 2, Tr("Passes", "Проходы"), Tr(
+				"How many times to trace each contour before moving to the next one.",
+				"Сколько раз обойти контур, прежде чем перейти к следующему."), 1, 30, 0, 1);
 
-			mMargin = AddNum(table, Tr("Start margin outside the drawing, mm", "Отступ снаружи габарита, мм"), 0, 500, 1, 1);
-			mLaserX = AddNum(table, Tr("Positioning laser offset X, mm", "Смещение позиционного лазера X, мм"), -500, 500, 1, 1);
-			mLaserY = AddNum(table, Tr("Positioning laser offset Y, mm", "Смещение позиционного лазера Y, мм"), -500, 500, 1, 1);
-			mCutSpeed = AddNum(table, Tr("Cut speed, mm/min", "Скорость реза, мм/мин"), 1, 50000, 0, 50);
-			mTravel = AddNum(table, Tr("Travel speed, mm/min (0 = cut speed, no G0 while the knife stays down)", "Переезд, мм/мин (0 = скорость реза; нож не поднимается)"), 0, 50000, 0, 50);
-			mPlunge = AddNum(table, Tr("Plunge speed, mm/min", "Скорость опускания, мм/мин"), 1, 50000, 0, 50);
-			mDwellDown = AddNum(table, Tr("Dwell after down, ms", "Пауза после опускания, мс"), 0, 5000, 0, 10);
-			mDwellUp = AddNum(table, Tr("Dwell after up, ms", "Пауза после подъёма, мс"), 0, 5000, 0, 10);
+			mOffset = PlaceNum(table, 0, Tr("Offset, mm", "Смещение, мм"), Tr(
+				"How far the swivel axis leads the tip. Also the radius of the swing at a sharp corner.",
+				"Насколько ось впереди острия. Это же радиус дуги на остром углу."), 0, 20, 2, 0.05m);
+			mOvercut = PlaceNum(table, 2, Tr("Overcut, mm", "Перерез, мм"), Tr(
+				"How far the tip runs past the seam of a closed contour. Keep it about the same as the offset, and shorter than the first side.",
+				"Насколько остриё заходит за шов. Обычно как смещение, и короче первой стороны."), 0, 50, 2, 0.1m);
 
-			mPen = AddCombo(table, Tr("Knife up / down", "Подъём / опускание ножа"));
+			mLeadIn = PlaceNum(table, 0, Tr("Lead-in, mm", "Заход, мм"), Tr(
+				"Straight run that lines the blade up before the drawing. It is also a cut.",
+				"Прямой участок, на котором лезвие выравнивается до рисунка. Он тоже режется."), 0, 50, 2, 0.1m);
+			mCorner = PlaceNum(table, 2, Tr("Sharp from, °", "Острый от, °"), Tr(
+				"An isolated corner at least this sharp swings the holder around the tip. Arcs and fillets stay smooth at any threshold.",
+				"Отдельный угол не слабее этого числа получает дугу разворота. Дуги и скругления остаются плавными при любом пороге."), 0, 180, 0, 1);
+
+			mSimplify = PlaceNum(table, 0, Tr("Simplify, mm", "Упрощение, мм"), Tr(
+				"Removes wobble smaller than this before the blade offset is applied. Too much turns a fillet into one sharp corner.",
+				"Стирает дрожание мельче этого до компенсации лезвия. Слишком большое значение схлопывает скругление в один острый угол."), 0, 5, 2, 0.01m);
+			mMinSeg = PlaceNum(table, 2, Tr("Min segment, mm", "Мин. отрезок, мм"), Tr(
+				"Drops pieces shorter than this after simplifying.",
+				"Убирает куски короче этого уже после упрощения."), 0, 5, 2, 0.01m);
+
+			Section(table, Tr("Sheet and path", "Лист и путь"));
+			mRoute = PlaceCombo(table, Tr("Optimization", "Оптимизация"), Tr(
+				"Nearest: the closest contour you can reach without crossing another. Outside in: shapes on the sheet edge first, then toward the middle. Inside out: a hole before its frame when the approach is already clear. File order: do not reorder. In every mode the knife walks around closed contours instead of cutting through them. A straight bridge remains only into a hole that cannot be reached from outside.",
+				"До ближайшего — ближайший контур, до которого можно доехать, не пересекая другие. Снаружи внутрь — сначала фигуры у края листа, потом ближе к середине. Изнутри наружу — отверстие раньше рамки, если подъезд уже свободен. Как в файле — порядок не менять. В любом режиме нож обходит замкнутые контуры. Прямая сквозь контур остаётся только мостиком в дырку, до которой снаружи не добраться."));
+			mRoute.Items.Add(new RouteItem(PlotterRouteMode.Nearest, Tr("Nearest contour", "До ближайшего контура")));
+			mRoute.Items.Add(new RouteItem(PlotterRouteMode.OutsideIn, Tr("Outside in", "Снаружи внутрь")));
+			mRoute.Items.Add(new RouteItem(PlotterRouteMode.InsideOut, Tr("Inside out", "Изнутри наружу")));
+			mRoute.Items.Add(new RouteItem(PlotterRouteMode.FileOrder, Tr("File order", "Как в файле")));
+			mRoute.DropDownWidth = 360;
+
+			mMargin = PlaceNum(table, 0, Tr("Margin, mm", "Отступ, мм"), Tr(
+				"Park distance outside the drawing corner, both left and toward you. 0 disables the park move.",
+				"Насколько парковка левее и ближе к вам, чем угол рисунка. 0 — без парковки."), 0, 500, 1, 1);
+			mLaserX = PlaceNum(table, 0, Tr("Laser X, mm", "Лазер X, мм"), Tr(
+				"How far the positioning laser sits to the right of the blade. Aim the laser at the sheet corner, then zero XY.",
+				"Насколько лазер правее лезвия. Наведите лазер на угол листа и обнулите XY."), -500, 500, 1, 1);
+			mLaserY = PlaceNum(table, 2, Tr("Laser Y, mm", "Лазер Y, мм"), Tr(
+				"How far the laser sits farther from you than the blade. Positive Y is away from the operator.",
+				"Насколько лазер дальше от вас, чем лезвие. Плюс Y — от себя."), -500, 500, 1, 1);
+
+			mCutSpeed = PlaceNum(table, 0, Tr("Cut, mm/min", "Рез, мм/мин"), Tr(
+				"Feed on the contour, the lead-in, the corner swing and the overcut.",
+				"Подача на контуре, заходе, дуге угла и перерезе."), 1, 50000, 0, 50);
+			mTravel = PlaceNum(table, 2, Tr("Travel, mm/min", "Переезд, мм/мин"), Tr(
+				"Feed between contours. 0 uses the cut speed. With manual height the move is still G1 and still cuts, so it is routed around other contours.",
+				"Подача между контурами. 0 — скорость реза. При высоте вручную это всё равно G1 и всё равно режет, поэтому путь идёт в обход."), 0, 50000, 0, 50);
+
+			mPen = PlaceCombo(table, Tr("Knife", "Нож"), Tr(
+				"Manual height: the knife never lifts, and every XY move is G1. The other three modes lift between contours.",
+				"Высота вручную — нож не поднимается, любое XY это G1. Остальные три режима поднимают нож между контурами."));
 			mPen.Items.Add(new PenItem(PlotterPenMode.Manual, Tr("Manual height, XY only", "Высота вручную, только X и Y")));
 			mPen.Items.Add(new PenItem(PlotterPenMode.ServoPwm, Tr("Servo on laser PWM (M3 S)", "Серво на ШИМ лазера (M3 S)")));
 			mPen.Items.Add(new PenItem(PlotterPenMode.Digital, Tr("Solenoid M3 down / M5 up", "Соленоид M3 вниз / M5 вверх")));
 			mPen.Items.Add(new PenItem(PlotterPenMode.ZAxis, Tr("Z axis", "Ось Z")));
 			mPen.SelectedIndexChanged += PenModeChanged;
 
-			mServoUp = AddNum(table, Tr("S value, knife up", "Значение S, нож вверх"), 0, 100000, 0, 1);
-			mServoDown = AddNum(table, Tr("S value, knife down", "Значение S, нож вниз"), 0, 100000, 0, 1);
-			mZUp = AddNum(table, Tr("Z up, mm", "Z вверх, мм"), -50, 200, 2, 0.1m);
-			mZDown = AddNum(table, Tr("Z down, mm", "Z вниз, мм"), -50, 200, 2, 0.1m);
-			mOrder = AddCheck(table, Tr("Sort contours (short travels, small swivels)", "Сортировать контуры (короче переезды, меньше разворотов)"));
-			mInside = AddCheck(table, Tr("Cut holes first when the knife can reach them", "Сначала отверстия, если к ним можно подойти"));
-			mLinearize = AddCheck(table, Tr("Replace corner arcs with short lines", "Заменять дуги поворота короткими отрезками"));
+			Section(table, Tr("Lift (ignored for manual height)", "Подъём (для ручной высоты не используется)"));
+			mLift = PlaceNum(table, 0, Tr("Lift above, °", "Подъём от, °"), Tr(
+				"With a liftable knife, a turn at least this sharp lifts instead of swinging. 0 never lifts. Manual height ignores this.",
+				"Если нож умеет подниматься, поворот не слабее этого поднимает его вместо дуги. 0 — не поднимать. Ручная высота это игнорирует."), 0, 180, 0, 1);
+			mPlunge = PlaceNum(table, 2, Tr("Plunge, mm/min", "Врезка, мм/мин"), Tr(
+				"Z feed when lowering the knife. Manual height ignores this.",
+				"Подача оси Z при опускании. Ручная высота это игнорирует."), 1, 50000, 0, 50);
+
+			mDwellDown = PlaceNum(table, 0, Tr("Pause down, ms", "Пауза вниз, мс"), Tr(
+				"Wait after the knife goes down, before the cut. Manual height ignores this.",
+				"Пауза после опускания, до реза. Ручная высота это игнорирует."), 0, 5000, 0, 10);
+			mDwellUp = PlaceNum(table, 2, Tr("Pause up, ms", "Пауза вверх, мс"), Tr(
+				"Wait after the knife lifts, before the travel. Manual height ignores this.",
+				"Пауза после подъёма, до переезда. Ручная высота это игнорирует."), 0, 5000, 0, 10);
+
+			mServoUp = PlaceNum(table, 0, Tr("S up", "S вверх"), Tr(
+				"PWM or solenoid value with the knife up.",
+				"Значение ШИМ или соленоида, когда нож поднят."), 0, 100000, 0, 1);
+			mServoDown = PlaceNum(table, 2, Tr("S down", "S вниз"), Tr(
+				"PWM or solenoid value with the knife down.",
+				"Значение ШИМ или соленоида, когда нож опущен."), 0, 100000, 0, 1);
+
+			mZUp = PlaceNum(table, 0, Tr("Z up, mm", "Z вверх, мм"), Tr("Z position with the knife up.", "Координата Z, когда нож поднят."), -50, 200, 2, 0.1m);
+			mZDown = PlaceNum(table, 2, Tr("Z down, mm", "Z вниз, мм"), Tr("Z position with the knife down.", "Координата Z, когда нож опущен."), -50, 200, 2, 0.1m);
+
+			mLinearize = new CheckBox();
+			mLinearize.Text = Tr("Corner arcs as short lines", "Дуги угла — короткими отрезками");
+			mLinearize.AutoSize = true;
+			mLinearize.Anchor = AnchorStyles.Left;
+			mLinearize.Margin = new Padding(0, 2, 0, 2);
+			AddRow(table, 26);
+			table.Controls.Add(mLinearize, 0, table.RowCount - 1);
+			table.SetColumnSpan(mLinearize, 4);
+			mTip.SetToolTip(mLinearize, Tr(
+				"Same corner swing, written as short G1 moves every 10 degrees instead of G2 or G3.",
+				"Та же дуга угла, но серией G1 через 10°, без G2 и G3."));
 
 			Label help = new Label();
 			help.AutoSize = false;
-			help.Height = 156;
-			help.Dock = DockStyle.Top;
+			help.Dock = DockStyle.Fill;
+			help.TextAlign = ContentAlignment.TopLeft;
+			help.Margin = new Padding(0, 4, 0, 0);
 			help.Text = Tr(
-				"Aim the positioning laser at the bottom-left corner of the sheet and zero XY. The laser sits to the right of the blade (default 10 mm, Y unchanged). The job moves the blade 20 mm outside that corner, to the left and toward you, then travels into the first contour. Every XY move is G1. A gentle turn follows the curve; a sharp corner swings the holder around the tip.",
-				"Наведите позиционный лазер на левый нижний угол листа и обнулите XY. Лазер правее лезвия (по умолчанию 10 мм, по Y без смещения). Программа сначала уводит лезвие на 20 мм за этот угол — влево и на себя — и только потом едет к первому контуру и врезается в лист. Любое движение X Y — это G1. Плавный поворот идёт по кривой, острый — дугой держателя вокруг острия.");
-			table.Controls.Add(help, 0, table.RowCount);
-			table.SetColumnSpan(help, 2);
-			table.RowStyles.Add(new RowStyle(SizeType.Absolute, 164));
+				"Aim the laser at the bottom-left corner of the sheet and zero XY. The blade parks outside that corner and walks around other closed contours. Hover a field for what it does to the path.",
+				"Наведите лазер на левый нижний угол листа и обнулите XY. Лезвие паркуется снаружи этого угла и обходит чужие замкнутые контуры. Наведите курсор на поле — подсказка, как оно меняет путь.");
+			AddRow(table, 48);
+			table.Controls.Add(help, 0, table.RowCount - 1);
+			table.SetColumnSpan(help, 4);
 
 			FlowLayoutPanel buttons = new FlowLayoutPanel();
 			buttons.FlowDirection = FlowDirection.RightToLeft;
 			buttons.Dock = DockStyle.Bottom;
-			buttons.Height = 42;
+			buttons.Height = 40;
 			buttons.Padding = new Padding(8, 6, 8, 6);
 			Button ok = new Button();
 			ok.Text = "OK";
 			ok.DialogResult = DialogResult.OK;
-			ok.Width = 100;
+			ok.Width = 88;
 			Button cancel = new Button();
 			cancel.Text = Tr("Cancel", "Отмена");
 			cancel.DialogResult = DialogResult.Cancel;
-			cancel.Width = 100;
+			cancel.Width = 88;
 			buttons.Controls.Add(ok);
 			buttons.Controls.Add(cancel);
 			Controls.Add(buttons);
@@ -199,8 +282,7 @@ namespace LaserGRBL.Plotter
 			Set(mServoDown, cfg.ServoDown);
 			Set(mZUp, (decimal)cfg.PenUpZ);
 			Set(mZDown, (decimal)cfg.PenDownZ);
-			mOrder.Checked = cfg.OptimizeOrder;
-			mInside.Checked = cfg.InsideFirst;
+			SelectRoute(cfg.RouteMode);
 			mLinearize.Checked = cfg.LinearizeArcs;
 			mLoading = false;
 			UpdatePenFields();
@@ -252,8 +334,7 @@ namespace LaserGRBL.Plotter
 			cfg.ServoDown = (int)mServoDown.Value;
 			cfg.PenUpZ = (double)mZUp.Value;
 			cfg.PenDownZ = (double)mZDown.Value;
-			cfg.OptimizeOrder = mOrder.Checked;
-			cfg.InsideFirst = mInside.Checked;
+			cfg.RouteMode = ((RouteItem)mRoute.SelectedItem).Mode;
 			cfg.LinearizeArcs = mLinearize.Checked;
 			return cfg;
 		}
@@ -308,76 +389,108 @@ namespace LaserGRBL.Plotter
 			}
 		}
 
-		private NumericUpDown AddNum(TableLayoutPanel table, string label, decimal min, decimal max, int decimals, decimal step)
+		private void SelectRoute(PlotterRouteMode mode)
 		{
-			int row = table.RowCount;
-			table.RowCount = row + 1;
-			table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			for (int i = 0; i < mRoute.Items.Count; i++)
+			{
+				if (((RouteItem)mRoute.Items[i]).Mode == mode)
+				{
+					mRoute.SelectedIndex = i;
+					return;
+				}
+			}
+		}
+
+		private void Section(TableLayoutPanel table, string text)
+		{
+			AddRow(table, 22);
+			Label label = new Label();
+			label.Text = text;
+			label.Dock = DockStyle.Fill;
+			label.TextAlign = ContentAlignment.BottomLeft;
+			label.Margin = new Padding(0, 2, 0, 0);
+			label.Font = new Font(Font, FontStyle.Bold);
+			table.Controls.Add(label, 0, table.RowCount - 1);
+			table.SetColumnSpan(label, 4);
+		}
+
+		private void AddRow(TableLayoutPanel table, float height)
+		{
+			table.RowCount = table.RowCount + 1;
+			table.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+		}
+
+		private Label Caption(string label, string tip)
+		{
 			Label caption = new Label();
 			caption.Text = label;
-			caption.AutoSize = true;
-			caption.Anchor = AnchorStyles.Left;
-			caption.Margin = new Padding(3, 6, 3, 3);
+			caption.AutoSize = false;
+			caption.Dock = DockStyle.Fill;
+			caption.TextAlign = ContentAlignment.MiddleLeft;
+			caption.Margin = new Padding(0, 0, 6, 0);
+			caption.AutoEllipsis = true;
+			mTip.SetToolTip(caption, tip);
+			return caption;
+		}
+
+		private NumericUpDown PlaceNum(TableLayoutPanel table, int col, string label, string tip, decimal min, decimal max, int decimals, decimal step)
+		{
+			int row;
+			if (col == 0)
+			{
+				AddRow(table, 28);
+				row = table.RowCount - 1;
+			}
+			else
+				row = table.RowCount - 1;
+			table.Controls.Add(Caption(label, tip), col, row);
 			NumericUpDown num = new NumericUpDown();
 			num.Minimum = min;
 			num.Maximum = max;
 			num.DecimalPlaces = decimals;
 			num.Increment = step;
-			num.Width = 120;
+			num.Width = 108;
 			num.Anchor = AnchorStyles.Left;
+			num.Margin = new Padding(0, 2, 8, 2);
+			num.TextAlign = HorizontalAlignment.Right;
 			num.ThousandsSeparator = false;
-			table.Controls.Add(caption, 0, row);
-			table.Controls.Add(num, 1, row);
+			mTip.SetToolTip(num, tip);
+			table.Controls.Add(num, col + 1, row);
 			return num;
 		}
 
-		private ComboBox AddCombo(TableLayoutPanel table, string label)
+		private ComboBox PlaceCombo(TableLayoutPanel table, string label, string tip)
 		{
-			int row = table.RowCount;
-			table.RowCount = row + 1;
-			table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-			Label caption = new Label();
-			caption.Text = label;
-			caption.AutoSize = true;
-			caption.Anchor = AnchorStyles.Left;
-			caption.Margin = new Padding(3, 8, 3, 3);
+			AddRow(table, 28);
+			int row = table.RowCount - 1;
+			table.Controls.Add(Caption(label, tip), 0, row);
+			ComboBox box = NewCombo(tip);
+			table.Controls.Add(box, 1, row);
+			table.SetColumnSpan(box, 3);
+			return box;
+		}
+
+		private ComboBox NewCombo(string tip)
+		{
 			ComboBox box = new ComboBox();
 			box.DropDownStyle = ComboBoxStyle.DropDownList;
-			box.Width = 280;
 			box.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-			table.Controls.Add(caption, 0, row);
-			table.Controls.Add(box, 1, row);
+			box.Margin = new Padding(0, 2, 8, 2);
+			box.DropDownWidth = 280;
+			mTip.SetToolTip(box, tip);
 			return box;
 		}
 
-		private TextBox AddText(TableLayoutPanel table, string label)
+		private TextBox PlaceText(TableLayoutPanel table, int col, string label, string tip)
 		{
-			int row = table.RowCount;
-			table.RowCount = row + 1;
-			table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-			Label caption = new Label();
-			caption.Text = label;
-			caption.AutoSize = true;
-			caption.Anchor = AnchorStyles.Left;
+			AddRow(table, 28);
+			int row = table.RowCount - 1;
+			table.Controls.Add(Caption(label, tip), col, row);
 			TextBox box = new TextBox();
-			box.Width = 280;
 			box.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-			table.Controls.Add(caption, 0, row);
-			table.Controls.Add(box, 1, row);
-			return box;
-		}
-
-		private CheckBox AddCheck(TableLayoutPanel table, string label)
-		{
-			int row = table.RowCount;
-			table.RowCount = row + 1;
-			table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-			CheckBox box = new CheckBox();
-			box.Text = label;
-			box.AutoSize = true;
-			box.Margin = new Padding(3, 4, 3, 4);
-			table.Controls.Add(box, 0, row);
-			table.SetColumnSpan(box, 2);
+			box.Margin = new Padding(0, 3, 8, 3);
+			mTip.SetToolTip(box, tip);
+			table.Controls.Add(box, col + 1, row);
 			return box;
 		}
 
@@ -405,6 +518,18 @@ namespace LaserGRBL.Plotter
 			public PlotterPenMode Mode;
 			private readonly string mText;
 			public PenItem(PlotterPenMode mode, string text)
+			{
+				Mode = mode;
+				mText = text;
+			}
+			public override string ToString() { return mText; }
+		}
+
+		private sealed class RouteItem
+		{
+			public PlotterRouteMode Mode;
+			private readonly string mText;
+			public RouteItem(PlotterRouteMode mode, string text)
 			{
 				Mode = mode;
 				mText = text;
