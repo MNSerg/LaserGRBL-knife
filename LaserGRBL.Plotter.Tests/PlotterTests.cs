@@ -255,6 +255,77 @@ M5";
 		}
 
 		[Fact]
+		public void Route_across_many_rectangles_stays_outside_them()
+		{
+			List<PlotPath> walls = new List<PlotPath>();
+			for (int row = 0; row < 5; row++)
+			{
+				for (int col = 0; col < 6; col++)
+				{
+					double x = 15 + col * 30;
+					double y = 15 + row * 26;
+					walls.Add(Rect(x, y, x + 16, y + 12));
+				}
+			}
+
+			PlotPoint from = new PlotPoint(0, 0);
+			PlotPoint to = new PlotPoint(15 + 5 * 30, 15 + 4 * 26);
+			List<PlotPoint> route = SafeRoute.Route(from, to, walls, 2);
+			Assert.True(PlotGeom.Dist(route[route.Count - 1], to) < 0.05);
+
+			PlotPoint prev = from;
+			for (int i = 0; i < route.Count; i++)
+			{
+				for (int w = 0; w < walls.Count; w++)
+					Assert.False(PlotGeom.SegmentThroughInterior(prev, route[i], walls[w].Points));
+				prev = route[i];
+			}
+		}
+
+		[Fact]
+		public void Idle_moves_between_many_rectangles_do_not_cut_them()
+		{
+			PlotterConfig cfg = PlotterConfig.CreateDefault();
+			cfg.SimplifyMm = 0;
+			cfg.MinSegmentMm = 0;
+			cfg.BladeOffsetMm = 0;
+			cfg.LeadInMm = 0;
+			cfg.OvercutMm = 0;
+			cfg.CornerThresholdDeg = 180;
+			cfg.OptimizeOrder = true;
+			cfg.InsideFirst = true;
+			cfg.StartMarginMm = 0;
+			cfg.LaserOffsetX = 0;
+			cfg.LaserOffsetY = 0;
+
+			List<PlotPath> walls = new List<PlotPath>();
+			for (int row = 0; row < 5; row++)
+			{
+				for (int col = 0; col < 6; col++)
+				{
+					double x = 20 + col * 36;
+					double y = 20 + row * 32;
+					walls.Add(Rect(x, y, x + 18, y + 14));
+				}
+			}
+
+			string gcode = PlotterPipeline.ConvertPaths(walls, cfg);
+			Assert.DoesNotContain("G0", gcode);
+			List<PlotPoint> motion = MotionPoints(gcode);
+			PlotPoint prev = new PlotPoint(0, 0);
+			for (int i = 0; i < motion.Count; i++)
+			{
+				for (int w = 0; w < walls.Count; w++)
+				{
+					Assert.False(
+						CutsOpenInterior(prev, motion[i], walls[w].Points),
+						prev.X + "," + prev.Y + " -> " + motion[i].X + "," + motion[i].Y);
+				}
+				prev = motion[i];
+			}
+		}
+
+		[Fact]
 		public void Dxf_reads_line_polyline_circle_bulge_and_inches()
 		{
 			string dxf = "0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"
@@ -383,6 +454,27 @@ M5";
 			path.Points.Add(new PlotPoint(x1, y1));
 			path.Points.Add(new PlotPoint(x0, y1));
 			return path;
+		}
+
+		private static bool CutsOpenInterior(PlotPoint a, PlotPoint b, IList<PlotPoint> poly)
+		{
+			for (int sample = 1; sample <= 9; sample++)
+			{
+				double t = sample / 10.0;
+				PlotPoint point = new PlotPoint(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t);
+				if (!PlotGeom.PointInPoly(point, poly))
+					continue;
+				double nearest = double.MaxValue;
+				for (int i = 0; i < poly.Count; i++)
+				{
+					double dist = PlotGeom.DistPointSegment(point, poly[i], poly[(i + 1) % poly.Count]);
+					if (dist < nearest)
+						nearest = dist;
+				}
+				if (nearest > 0.3)
+					return true;
+			}
+			return false;
 		}
 
 		private static bool Near(PlotMove move, double x, double y)
