@@ -27,16 +27,19 @@ $pkg = Join-Path $pkgRoot "pkg"
 if (Test-Path $pkg) { Remove-Item $pkg -Recurse -Force }
 Expand-Archive -Path $nupkg -DestinationPath $pkg -Force
 $targets = Join-Path $pkg "build\Microsoft.NETFramework.ReferenceAssemblies.net40.targets"
-if (-not (Test-Path $targets)) { throw "Reference assemblies were not unpacked: $targets" }
+$framework = Join-Path $pkg "build\.NETFramework\v4.0"
+if (-not (Test-Path (Join-Path $framework "mscorlib.dll"))) { throw "Reference assemblies were not unpacked: $framework" }
 
 Write-Host "Using $msbuild"
+Write-Host "Reference assemblies: $framework"
 & $msbuild $csproj `
     /p:Configuration=$Configuration `
     /p:Platform=AnyCPU `
     /p:TargetFrameworkVersion=v4.0 `
     /p:OutputPath=bin\Release-win7\ `
     /p:IntermediateOutputPath=obj\Release-win7\ `
-    /p:Win7Net40Targets="$targets" `
+    /p:FrameworkPathOverride=$framework `
+    /p:Win7Net40Targets=$targets `
     /v:m
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

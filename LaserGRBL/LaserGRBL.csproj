@@ -90,8 +90,6 @@
   <PropertyGroup>
     <StartupObject>LaserGRBL.Program</StartupObject>
   </PropertyGroup>
-  <!-- Windows 7 build only. The 4.8 job does not set Win7Net40Targets, so this import is skipped and that build is unchanged. -->
-  <Import Project="$(Win7Net40Targets)" Condition="'$(Win7Net40Targets)' != '' And Exists('$(Win7Net40Targets)')" />
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
@@ -2582,6 +2580,8 @@
     <Folder Include="SvgLibrary\Web\Resources\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Windows 7 build only. Must come after CSharp.targets so TargetFrameworkIdentifier is already set. The 4.8 job does not set Win7Net40Targets. -->
+  <Import Project="$(Win7Net40Targets)" Condition="'$(Win7Net40Targets)' != '' And Exists('$(Win7Net40Targets)')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
