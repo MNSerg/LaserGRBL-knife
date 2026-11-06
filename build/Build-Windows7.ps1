@@ -34,7 +34,6 @@ Write-Host "Using $msbuild"
     /p:Configuration=$Configuration `
     /p:Platform=AnyCPU `
     /p:TargetFrameworkVersion=v4.0 `
-    /p:DefineConstants=TRACE`;NET40 `
     /p:OutputPath=bin\Release-win7\ `
     /p:IntermediateOutputPath=obj\Release-win7\ `
     /p:Win7Net40Targets="$targets" `
