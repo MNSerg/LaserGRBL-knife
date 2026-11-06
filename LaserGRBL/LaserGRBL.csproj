@@ -928,6 +928,7 @@
       <DependentUpon>PreviewForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Program.cs" />
+    <Compile Include="AutoStart.cs" />
     <Compile Include="AssemblyInfo.cs" />
     <Compile Include="ResumeJobForm.cs">
       <SubType>Form</SubType>

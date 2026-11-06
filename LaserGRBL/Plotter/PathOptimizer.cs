@@ -34,7 +34,7 @@ namespace LaserGRBL.Plotter
 					clean.Add(path);
 			}
 
-			if (cfg.PenMode == PlotterPenMode.Manual)
+			if (cfg.KnifeStaysDown)
 				return OrderKnifeDown(clean, cfg, start);
 
 			if (clean.Count <= 1 || cfg.RouteMode == PlotterRouteMode.FileOrder)

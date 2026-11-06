@@ -15,6 +15,15 @@ namespace LaserGRBL.Plotter
 		Manual = 3
 	}
 
+	/// <summary>How a Z-axis knife leaves the material. Ignored unless <see cref="PlotterPenMode.ZAxis"/> is selected.</summary>
+	public enum PlotterZLift
+	{
+		/// <summary>The blade is fixed on Z. The stepper raises and lowers that axis.</summary>
+		Standard = 0,
+		/// <summary>The Z motor lies on its side and turns a cam. The set turn pushes the head down; springs lift the blade when the cam releases.</summary>
+		Cam = 1
+	}
+
 	public enum PlotterBladePreset
 	{
 		Custom = 0,
@@ -64,6 +73,11 @@ namespace LaserGRBL.Plotter
 		public int ServoDown;
 		public double PenUpZ;
 		public double PenDownZ;
+		public PlotterZLift ZLift;
+		/// <summary>Z command that lets the cam go slack so the springs lift the blade.</summary>
+		public double CamUp;
+		/// <summary>Z command that turns the cam far enough to push the head down by the cam length.</summary>
+		public double CamDown;
 		public bool OptimizeOrder;
 		public bool InsideFirst;
 		public PlotterRouteMode RouteMode;
@@ -99,6 +113,9 @@ namespace LaserGRBL.Plotter
 			c.ServoDown = 255;
 			c.PenUpZ = 5;
 			c.PenDownZ = 0;
+			c.ZLift = PlotterZLift.Standard;
+			c.CamUp = 0;
+			c.CamDown = 90;
 			c.OptimizeOrder = true;
 			c.InsideFirst = false;
 			c.RouteMode = PlotterRouteMode.Nearest;
@@ -192,10 +209,23 @@ namespace LaserGRBL.Plotter
 			if (LaserOffsetY < -500) LaserOffsetY = -500;
 			if (LaserOffsetY > 500) LaserOffsetY = 500;
 			if (string.IsNullOrEmpty(BladeName)) BladeName = "Blade";
+			int lift = (int)ZLift;
+			if (lift != (int)PlotterZLift.Standard && lift != (int)PlotterZLift.Cam)
+				ZLift = PlotterZLift.Standard;
+			if (CamUp < -3600) CamUp = -3600;
+			if (CamUp > 3600) CamUp = 3600;
+			if (CamDown < -3600) CamDown = -3600;
+			if (CamDown > 3600) CamDown = 3600;
 			int route = (int)RouteMode;
 			if (route < 0 || route > 3) RouteMode = PlotterRouteMode.Nearest;
 			OptimizeOrder = RouteMode != PlotterRouteMode.FileOrder;
 			InsideFirst = RouteMode == PlotterRouteMode.InsideOut;
+		}
+
+		/// <summary>The blade never leaves the material, so every XY move cuts and travel must stay outside closed contours.</summary>
+		public bool KnifeStaysDown
+		{
+			get { return PenMode == PlotterPenMode.Manual; }
 		}
 	}
 }

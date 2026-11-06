@@ -25,6 +25,17 @@ namespace LaserGRBL.Plotter
 			else sb.Append("F").Append(cfg.TravelSpeed.ToString(System.Globalization.CultureInfo.InvariantCulture));
 			sb.Append(" paths ").Append(pathCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
 			sb.Append(" pen ").Append(cfg.PenMode.ToString()).Append(")\r\n");
+			if (cfg.PenMode == PlotterPenMode.ZAxis && cfg.ZLift == PlotterZLift.Cam)
+			{
+				sb.Append("(z cam, turn Z").Append(PlotGeom.Num(cfg.CamDown));
+				sb.Append(" pushes the head down, Z").Append(PlotGeom.Num(cfg.CamUp));
+				sb.Append(" releases and the springs lift)\r\n");
+			}
+			else if (cfg.PenMode == PlotterPenMode.ZAxis)
+			{
+				sb.Append("(z standard, up Z").Append(PlotGeom.Num(cfg.PenUpZ));
+				sb.Append(" down Z").Append(PlotGeom.Num(cfg.PenDownZ)).Append(")\r\n");
+			}
 			if (cfg.PenMode == PlotterPenMode.Manual)
 			{
 				sb.Append("(manual knife height, blade stays down)\r\n");
@@ -39,7 +50,7 @@ namespace LaserGRBL.Plotter
 			}
 			sb.Append("G90\r\n");
 
-			bool manual = cfg.PenMode == PlotterPenMode.Manual;
+			bool manual = cfg.KnifeStaysDown;
 			bool down = false;
 			if (!manual)
 				PenUp(sb, cfg);
@@ -123,7 +134,7 @@ namespace LaserGRBL.Plotter
 		{
 			// The knife is already in the material, so a rapid would still cut.
 			// Write the approach at feed rate and let the path planner keep it outside the part.
-			if (cfg.PenMode == PlotterPenMode.Manual)
+			if (cfg.KnifeStaysDown)
 			{
 				int stayDown = cfg.TravelSpeed > 0 ? cfg.TravelSpeed : cfg.CutSpeed;
 				if (stayDown <= 0)
@@ -153,9 +164,14 @@ namespace LaserGRBL.Plotter
 
 		private static void PenUp(StringBuilder sb, PlotterConfig cfg)
 		{
-			if (cfg.PenMode == PlotterPenMode.Manual)
+			if (cfg.KnifeStaysDown)
 				return;
-			if (cfg.PenMode == PlotterPenMode.ZAxis)
+			if (cfg.PenMode == PlotterPenMode.ZAxis && cfg.ZLift == PlotterZLift.Cam)
+			{
+				sb.Append("G1 Z").Append(PlotGeom.Num(cfg.CamUp));
+				sb.Append(" F").Append(cfg.PlungeSpeed.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append("\r\n");
+			}
+			else if (cfg.PenMode == PlotterPenMode.ZAxis)
 				sb.Append("G0 Z").Append(PlotGeom.Num(cfg.PenUpZ)).Append("\r\n");
 			else if (cfg.PenMode == PlotterPenMode.Digital)
 				sb.Append("M5 S0\r\n");
@@ -166,11 +182,12 @@ namespace LaserGRBL.Plotter
 
 		private static void PenDown(StringBuilder sb, PlotterConfig cfg)
 		{
-			if (cfg.PenMode == PlotterPenMode.Manual)
+			if (cfg.KnifeStaysDown)
 				return;
 			if (cfg.PenMode == PlotterPenMode.ZAxis)
 			{
-				sb.Append("G1 Z").Append(PlotGeom.Num(cfg.PenDownZ));
+				double z = cfg.ZLift == PlotterZLift.Cam ? cfg.CamDown : cfg.PenDownZ;
+				sb.Append("G1 Z").Append(PlotGeom.Num(z));
 				sb.Append(" F").Append(cfg.PlungeSpeed.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append("\r\n");
 			}
 			else if (cfg.PenMode == PlotterPenMode.Digital)

@@ -46,6 +46,9 @@ namespace LaserGRBL.Plotter
 			cfg.ServoDown = LaserGRBL.Settings.GetObject("Plotter.ServoDown", def.ServoDown);
 			cfg.PenUpZ = LaserGRBL.Settings.GetObject("Plotter.PenUpZ", def.PenUpZ);
 			cfg.PenDownZ = LaserGRBL.Settings.GetObject("Plotter.PenDownZ", def.PenDownZ);
+			cfg.ZLift = (PlotterZLift)LaserGRBL.Settings.GetObject("Plotter.ZLift", (int)def.ZLift);
+			cfg.CamUp = LaserGRBL.Settings.GetObject("Plotter.CamUp", def.CamUp);
+			cfg.CamDown = LaserGRBL.Settings.GetObject("Plotter.CamDown", def.CamDown);
 			cfg.OptimizeOrder = LaserGRBL.Settings.GetObject("Plotter.OptimizeOrder", def.OptimizeOrder);
 			cfg.InsideFirst = LaserGRBL.Settings.GetObject("Plotter.InsideFirst", def.InsideFirst);
 			int routeStored = LaserGRBL.Settings.GetObject("Plotter.RouteMode", -1);
@@ -94,6 +97,9 @@ namespace LaserGRBL.Plotter
 			LaserGRBL.Settings.SetObject("Plotter.ServoDown", cfg.ServoDown);
 			LaserGRBL.Settings.SetObject("Plotter.PenUpZ", cfg.PenUpZ);
 			LaserGRBL.Settings.SetObject("Plotter.PenDownZ", cfg.PenDownZ);
+			LaserGRBL.Settings.SetObject("Plotter.ZLift", (int)cfg.ZLift);
+			LaserGRBL.Settings.SetObject("Plotter.CamUp", cfg.CamUp);
+			LaserGRBL.Settings.SetObject("Plotter.CamDown", cfg.CamDown);
 			LaserGRBL.Settings.SetObject("Plotter.RouteMode", (int)cfg.RouteMode);
 			LaserGRBL.Settings.SetObject("Plotter.OptimizeOrder", cfg.RouteMode != PlotterRouteMode.FileOrder);
 			LaserGRBL.Settings.SetObject("Plotter.InsideFirst", cfg.RouteMode == PlotterRouteMode.InsideOut);

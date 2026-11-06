@@ -106,6 +106,7 @@ namespace LaserGRBL
 
             CheckLineWidthItem();
 			InstallPlotterMenu();
+			SettingsForm.SettingsChanged += OnSettingsChanged;
 
 			MnGrblConfig.Visible = Core.UIShowGrblConfig;
 			MnUnlock.Visible = Core.UIShowUnlockButtons;
@@ -304,15 +305,10 @@ namespace LaserGRBL
 					GitHub.CheckVersion(false);
 
 				SuspendLayout();
-				//restore last size and position
-				Object[] msp = Settings.GetObject<Object[]>("Mainform Size and Position", null);
-				FormWindowState state = msp == null ? FormWindowState.Maximized : (FormWindowState)msp[2] != FormWindowState.Minimized ? (FormWindowState)msp[2] : FormWindowState.Maximized;
-				if (state == FormWindowState.Normal)
-				{ WindowState = state; Size = (Size)msp[0]; Location = (Point)msp[1]; }
-
-				if (!IsVisibleOnAnyScreen(new Rectangle(Location, Size))) //ensure form is visible if stored position is no longer valid on current screen configuration
-				{ WindowState = FormWindowState.Normal; Size = new Size(1024, 768); CenterToScreen(); }
-
+				if (AutoStart.IsEnabled)
+					EnterFullScreen();
+				else
+					RestoreWindowPlacement();
 				ResumeLayout();
 
 				ManageMessage();
@@ -322,6 +318,47 @@ namespace LaserGRBL
 			{
 				Close();
 			}
+		}
+
+		private bool mFullScreen;
+
+		private void OnSettingsChanged(object sender, EventArgs e)
+		{
+			if (AutoStart.IsEnabled)
+				EnterFullScreen();
+			else if (mFullScreen)
+				LeaveFullScreen();
+		}
+
+		private void EnterFullScreen()
+		{
+			mFullScreen = true;
+			FormBorderStyle = FormBorderStyle.None;
+			WindowState = FormWindowState.Normal;
+			Screen screen = Screen.FromControl(this);
+			if (screen == null)
+				screen = Screen.PrimaryScreen;
+			Bounds = screen.Bounds;
+			WindowState = FormWindowState.Maximized;
+		}
+
+		private void LeaveFullScreen()
+		{
+			mFullScreen = false;
+			FormBorderStyle = FormBorderStyle.Sizable;
+			WindowState = FormWindowState.Maximized;
+		}
+
+		private void RestoreWindowPlacement()
+		{
+				//restore last size and position
+				Object[] msp = Settings.GetObject<Object[]>("Mainform Size and Position", null);
+				FormWindowState state = msp == null ? FormWindowState.Maximized : (FormWindowState)msp[2] != FormWindowState.Minimized ? (FormWindowState)msp[2] : FormWindowState.Maximized;
+				if (state == FormWindowState.Normal)
+				{ WindowState = state; Size = (Size)msp[0]; Location = (Point)msp[1]; }
+
+				if (!IsVisibleOnAnyScreen(new Rectangle(Location, Size))) //ensure form is visible if stored position is no longer valid on current screen configuration
+				{ WindowState = FormWindowState.Normal; Size = new Size(1024, 768); CenterToScreen(); }
 		}
 
 		public bool IsVisibleOnAnyScreen(Rectangle rect)
@@ -439,7 +476,8 @@ namespace LaserGRBL
 			{
 				SincroStart.StopListen();
 				Core.Exiting();
-				Settings.SetObject("Mainform Size and Position", new object[] { Size, Location, WindowState });
+				if (!mFullScreen)
+					Settings.SetObject("Mainform Size and Position", new object[] { Size, Location, WindowState });
 				Settings.Exiting();
 
 				UsageStats.SaveFile(Core);

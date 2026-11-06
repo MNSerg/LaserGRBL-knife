@@ -50,7 +50,7 @@ namespace LaserGRBL.Plotter
 				cursor = park;
 				return;
 			}
-			if (cfg.PenMode == PlotterPenMode.Manual)
+			if (cfg.KnifeStaysDown)
 			{
 				double margin = cfg.LeadInMm;
 				if (cfg.BladeOffsetMm > margin)
@@ -104,7 +104,7 @@ namespace LaserGRBL.Plotter
 				align = dir[0];
 			PlotPoint holderStart = Shift(pts[0], align, offset - lead);
 
-			if (cfg.PenMode == PlotterPenMode.Manual)
+			if (cfg.KnifeStaysDown)
 			{
 				double margin = lead;
 				if (offset > margin)
@@ -281,7 +281,7 @@ namespace LaserGRBL.Plotter
 
 		private static bool ShouldLift(PlotterConfig cfg, double deg)
 		{
-			if (cfg.PenMode == PlotterPenMode.Manual)
+			if (cfg.KnifeStaysDown)
 				return false;
 			return cfg.LiftAngleDeg > 0 && deg >= cfg.LiftAngleDeg;
 		}

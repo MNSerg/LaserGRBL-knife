@@ -32,6 +32,9 @@ namespace LaserGRBL.Plotter
 		private readonly NumericUpDown mServoDown;
 		private readonly NumericUpDown mZUp;
 		private readonly NumericUpDown mZDown;
+		private readonly ComboBox mZLift;
+		private readonly NumericUpDown mCamUp;
+		private readonly NumericUpDown mCamDown;
 		private readonly ComboBox mRoute;
 		private readonly CheckBox mLinearize;
 		private readonly NumericUpDown mMargin;
@@ -62,7 +65,7 @@ namespace LaserGRBL.Plotter
 			ShowInTaskbar = false;
 			AutoScaleMode = AutoScaleMode.Font;
 			Font = SystemFonts.MessageBoxFont;
-			ClientSize = new Size(620, 640);
+			ClientSize = new Size(620, 700);
 			try
 			{
 				BackColor = LaserGRBL.ColorScheme.FormBackColor;
@@ -140,8 +143,8 @@ namespace LaserGRBL.Plotter
 
 			Section(table, Tr("Sheet and path", "Лист и путь"));
 			mRoute = PlaceCombo(table, Tr("Optimization", "Оптимизация"), Tr(
-				"Nearest: the closest contour you can reach without crossing another. Outside in: shapes on the sheet edge first, then toward the middle. Inside out: a hole before its frame when the approach is already clear. File order: do not reorder. In every mode the knife walks around closed contours instead of cutting through them. A straight bridge remains only into a hole that cannot be reached from outside.",
-				"До ближайшего — ближайший контур, до которого можно доехать, не пересекая другие. Снаружи внутрь — сначала фигуры у края листа, потом ближе к середине. Изнутри наружу — отверстие раньше рамки, если подъезд уже свободен. Как в файле — порядок не менять. В любом режиме нож обходит замкнутые контуры. Прямая сквозь контур остаётся только мостиком в дырку, до которой снаружи не добраться."));
+				"Nearest: the closest contour you can reach without crossing another. Outside in: shapes on the sheet edge first, then toward the middle. Inside out: a hole before its frame when the approach is already clear. File order: do not reorder. While the knife stays down, travel walks around closed contours. A straight bridge remains only into a hole that cannot be reached from outside. With Z, a servo or a solenoid the knife lifts, so travel goes straight across.",
+				"До ближайшего — ближайший контур, до которого можно доехать, не пересекая другие. Снаружи внутрь — сначала фигуры у края листа, потом ближе к середине. Изнутри наружу — отверстие раньше рамки, если подъезд уже свободен. Как в файле — порядок не менять. Пока нож не поднимается, переезд обходит замкнутые контуры. Прямая сквозь контур остаётся только мостиком в дырку. С осью Z, серво или соленоидом нож поднимается, и переезд идёт по прямой поверх фигур."));
 			mRoute.Items.Add(new RouteItem(PlotterRouteMode.Nearest, Tr("Nearest contour", "До ближайшего контура")));
 			mRoute.Items.Add(new RouteItem(PlotterRouteMode.OutsideIn, Tr("Outside in", "Снаружи внутрь")));
 			mRoute.Items.Add(new RouteItem(PlotterRouteMode.InsideOut, Tr("Inside out", "Изнутри наружу")));
@@ -166,8 +169,8 @@ namespace LaserGRBL.Plotter
 				"Подача между контурами. 0 — скорость реза. При высоте вручную это всё равно G1 и всё равно режет, поэтому путь идёт в обход."), 0, 50000, 0, 50);
 
 			mPen = PlaceCombo(table, Tr("Knife", "Нож"), Tr(
-				"Manual height: the knife never lifts, and every XY move is G1. The other three modes lift between contours.",
-				"Высота вручную — нож не поднимается, любое XY это G1. Остальные три режима поднимают нож между контурами."));
+				"Manual height: the knife never lifts, and every XY move is G1, routed around closed contours. Z, servo and solenoid lift the knife, so travel may cross the sheet in a straight line.",
+				"Высота вручную — нож не поднимается, любое XY это G1 в обход контуров. Ось Z, серво и соленоид поднимают нож, и переезд идёт прямой поверх листа."));
 			mPen.Items.Add(new PenItem(PlotterPenMode.Manual, Tr("Manual height, XY only", "Высота вручную, только X и Y")));
 			mPen.Items.Add(new PenItem(PlotterPenMode.ServoPwm, Tr("Servo on laser PWM (M3 S)", "Серво на ШИМ лазера (M3 S)")));
 			mPen.Items.Add(new PenItem(PlotterPenMode.Digital, Tr("Solenoid M3 down / M5 up", "Соленоид M3 вниз / M5 вверх")));
@@ -175,6 +178,14 @@ namespace LaserGRBL.Plotter
 			mPen.SelectedIndexChanged += PenModeChanged;
 
 			Section(table, Tr("Lift (ignored for manual height)", "Подъём (для ручной высоты не используется)"));
+			mZLift = PlaceCombo(table, Tr("Z lift", "Подъём Z"), Tr(
+				"Shown when Knife is Z axis. Standard: the stepper raises and lowers the blade. Cam: the motor is turned on its side; the set push turn drives the head down by the cam length, and springs lift the blade when the cam releases. Either way the knife is up between contours, so the path crosses instead of walking around.",
+				"Доступно, когда выбран «Нож — Ось Z». Стандартный: шаговик поднимает и опускает лезвие. Кулачок: двигатель повёрнут на 90°, поворот «Нажим» толкает голову вниз на длину кулачка, а пружины поднимают лезвие, когда кулачок отпускает. В обоих случаях нож на переезде поднят, поэтому путь идёт поверх контуров, а не в обход."));
+			mZLift.Items.Add(new ZLiftItem(PlotterZLift.Standard, Tr("Standard, stepper moves Z", "Стандартный, шаговик двигает Z")));
+			mZLift.Items.Add(new ZLiftItem(PlotterZLift.Cam, Tr("Cam, springs lift the blade", "Кулачок, вверх пружинами")));
+			mZLift.SelectedIndexChanged += PenModeChanged;
+			mZLift.DropDownWidth = 360;
+
 			mLift = PlaceNum(table, 0, Tr("Lift above, °", "Подъём от, °"), Tr(
 				"With a liftable knife, a turn at least this sharp lifts instead of swinging. 0 never lifts. Manual height ignores this.",
 				"Если нож умеет подниматься, поворот не слабее этого поднимает его вместо дуги. 0 — не поднимать. Ручная высота это игнорирует."), 0, 180, 0, 1);
@@ -196,8 +207,14 @@ namespace LaserGRBL.Plotter
 				"PWM or solenoid value with the knife down.",
 				"Значение ШИМ или соленоида, когда нож опущен."), 0, 100000, 0, 1);
 
-			mZUp = PlaceNum(table, 0, Tr("Z up, mm", "Z вверх, мм"), Tr("Z position with the knife up.", "Координата Z, когда нож поднят."), -50, 200, 2, 0.1m);
-			mZDown = PlaceNum(table, 2, Tr("Z down, mm", "Z вниз, мм"), Tr("Z position with the knife down.", "Координата Z, когда нож опущен."), -50, 200, 2, 0.1m);
+			mZUp = PlaceNum(table, 0, Tr("Z up, mm", "Z вверх, мм"), Tr("Standard Z: position with the knife up.", "Стандартная ось: координата, когда нож поднят."), -50, 200, 2, 0.1m);
+			mZDown = PlaceNum(table, 2, Tr("Z down, mm", "Z вниз, мм"), Tr("Standard Z: position with the knife down.", "Стандартная ось: координата, когда нож опущен."), -50, 200, 2, 0.1m);
+			mCamUp = PlaceNum(table, 0, Tr("Cam release", "Отпуск кулачка"), Tr(
+				"Z command that rotates the cam clear. The springs then lift the blade. Travel happens in this position.",
+				"Команда Z, при которой кулачок отпускает голову. Дальше лезвие поднимают пружины. Переезд едет в этом положении."), -3600, 3600, 2, 1);
+			mCamDown = PlaceNum(table, 2, Tr("Cam push", "Нажим кулачка"), Tr(
+				"Z command that turns the cam far enough to push the head down by the cam length.",
+				"Команда Z, поворот на которую толкает голову вниз на длину кулачка."), -3600, 3600, 2, 1);
 
 			mLinearize = new CheckBox();
 			mLinearize.Text = Tr("Corner arcs as short lines", "Дуги угла — короткими отрезками");
@@ -282,6 +299,9 @@ namespace LaserGRBL.Plotter
 			Set(mServoDown, cfg.ServoDown);
 			Set(mZUp, (decimal)cfg.PenUpZ);
 			Set(mZDown, (decimal)cfg.PenDownZ);
+			SelectZLift(cfg.ZLift);
+			Set(mCamUp, (decimal)cfg.CamUp);
+			Set(mCamDown, (decimal)cfg.CamDown);
 			SelectRoute(cfg.RouteMode);
 			mLinearize.Checked = cfg.LinearizeArcs;
 			mLoading = false;
@@ -297,10 +317,15 @@ namespace LaserGRBL.Plotter
 		private void UpdatePenFields()
 		{
 			bool manual = mPen.SelectedItem != null && ((PenItem)mPen.SelectedItem).Mode == PlotterPenMode.Manual;
-			mServoUp.Enabled = !manual;
-			mServoDown.Enabled = !manual;
-			mZUp.Enabled = !manual;
-			mZDown.Enabled = !manual;
+			bool zAxis = mPen.SelectedItem != null && ((PenItem)mPen.SelectedItem).Mode == PlotterPenMode.ZAxis;
+			bool cam = zAxis && mZLift.SelectedItem != null && ((ZLiftItem)mZLift.SelectedItem).Mode == PlotterZLift.Cam;
+			mZLift.Enabled = zAxis;
+			mServoUp.Enabled = !manual && !zAxis;
+			mServoDown.Enabled = !manual && !zAxis;
+			mZUp.Enabled = zAxis && !cam;
+			mZDown.Enabled = zAxis && !cam;
+			mCamUp.Enabled = cam;
+			mCamDown.Enabled = cam;
 			mPlunge.Enabled = !manual;
 			mDwellDown.Enabled = !manual;
 			mDwellUp.Enabled = !manual;
@@ -334,6 +359,9 @@ namespace LaserGRBL.Plotter
 			cfg.ServoDown = (int)mServoDown.Value;
 			cfg.PenUpZ = (double)mZUp.Value;
 			cfg.PenDownZ = (double)mZDown.Value;
+			cfg.ZLift = mZLift.SelectedItem == null ? PlotterZLift.Standard : ((ZLiftItem)mZLift.SelectedItem).Mode;
+			cfg.CamUp = (double)mCamUp.Value;
+			cfg.CamDown = (double)mCamDown.Value;
 			cfg.RouteMode = ((RouteItem)mRoute.SelectedItem).Mode;
 			cfg.LinearizeArcs = mLinearize.Checked;
 			return cfg;
@@ -384,6 +412,18 @@ namespace LaserGRBL.Plotter
 				if (((PenItem)mPen.Items[i]).Mode == mode)
 				{
 					mPen.SelectedIndex = i;
+					return;
+				}
+			}
+		}
+
+		private void SelectZLift(PlotterZLift mode)
+		{
+			for (int i = 0; i < mZLift.Items.Count; i++)
+			{
+				if (((ZLiftItem)mZLift.Items[i]).Mode == mode)
+				{
+					mZLift.SelectedIndex = i;
 					return;
 				}
 			}
@@ -518,6 +558,18 @@ namespace LaserGRBL.Plotter
 			public PlotterPenMode Mode;
 			private readonly string mText;
 			public PenItem(PlotterPenMode mode, string text)
+			{
+				Mode = mode;
+				mText = text;
+			}
+			public override string ToString() { return mText; }
+		}
+
+		private sealed class ZLiftItem
+		{
+			public PlotterZLift Mode;
+			private readonly string mText;
+			public ZLiftItem(PlotterZLift mode, string text)
 			{
 				Mode = mode;
 				mText = text;

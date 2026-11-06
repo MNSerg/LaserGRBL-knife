@@ -605,6 +605,73 @@ M5";
 		}
 
 		[Fact]
+		public void Z_standard_lifts_and_travels_straight_across_a_contour()
+		{
+			PlotPath far = Rect(40, 0, 50, 10);
+			PlotPath wall = Rect(15, -5, 35, 20);
+			PlotterConfig cfg = Knife();
+			cfg.PenMode = PlotterPenMode.ZAxis;
+			cfg.ZLift = PlotterZLift.Standard;
+			cfg.PenUpZ = 5;
+			cfg.PenDownZ = -1;
+			cfg.PlungeSpeed = 300;
+			cfg.RouteMode = PlotterRouteMode.FileOrder;
+			cfg.BladeOffsetMm = 0;
+
+			string gcode = PlotterPipeline.ConvertPaths(new PlotPath[] { far, wall }, cfg);
+			Assert.Contains("G0 Z5", gcode);
+			Assert.Contains("G1 Z-1", gcode);
+			Assert.Contains("z standard", gcode);
+			Assert.DoesNotContain("z cam", gcode);
+			Assert.True(TravelCrosses(gcode, wall.Points));
+		}
+
+		[Fact]
+		public void Z_cam_pushes_with_the_set_turn_and_crosses_while_the_springs_hold_it_up()
+		{
+			PlotPath far = Rect(40, 0, 50, 10);
+			PlotPath wall = Rect(15, -5, 35, 20);
+			PlotterConfig cfg = Knife();
+			cfg.PenMode = PlotterPenMode.ZAxis;
+			cfg.ZLift = PlotterZLift.Cam;
+			cfg.CamUp = 0;
+			cfg.CamDown = 90;
+			cfg.PenUpZ = 8;
+			cfg.PenDownZ = -3;
+			cfg.PlungeSpeed = 250;
+			cfg.RouteMode = PlotterRouteMode.FileOrder;
+			cfg.BladeOffsetMm = 0;
+
+			string gcode = PlotterPipeline.ConvertPaths(new PlotPath[] { far, wall }, cfg);
+			Assert.Contains("G1 Z90", gcode);
+			Assert.Contains("G1 Z0", gcode);
+			Assert.Contains("F250", gcode);
+			Assert.Contains("z cam", gcode);
+			Assert.DoesNotContain("G0 Z", gcode);
+			Assert.DoesNotContain("Z8", gcode);
+			Assert.DoesNotContain("Z-3", gcode);
+			Assert.True(TravelCrosses(gcode, wall.Points));
+
+			cfg.PenMode = PlotterPenMode.Manual;
+			string down = PlotterPipeline.ConvertPaths(new PlotPath[] { far, wall }, cfg);
+			Assert.False(TravelCrosses(down, wall.Points));
+			Assert.DoesNotContain(" Z", down);
+		}
+
+		private static bool TravelCrosses(string gcode, System.Collections.Generic.IList<PlotPoint> poly)
+		{
+			System.Collections.Generic.List<PlotPoint> motion = MotionPoints(gcode);
+			PlotPoint prev = new PlotPoint(0, 0);
+			for (int i = 0; i < motion.Count; i++)
+			{
+				if (CutsOpenInterior(prev, motion[i], poly))
+					return true;
+				prev = motion[i];
+			}
+			return false;
+		}
+
+		[Fact]
 		public void Manual_height_emits_xy_only_at_cut_speed()
 		{
 			PlotterConfig cfg = PlotterConfig.CreateDefault();
