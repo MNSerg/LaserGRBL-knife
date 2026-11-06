@@ -87,6 +87,8 @@
   <PropertyGroup>
     <StartupObject>LaserGRBL.Program</StartupObject>
   </PropertyGroup>
+  <!-- Windows 7 build only. The 4.8 job does not set Win7Net40Targets, so this import is skipped and that build is unchanged. -->
+  <Import Project="$(Win7Net40Targets)" Condition="'$(Win7Net40Targets)' != '' And Exists('$(Win7Net40Targets)')" />
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />

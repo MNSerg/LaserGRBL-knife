@@ -21,6 +21,8 @@ powershell -ExecutionPolicy Bypass -File build\Build-Windows.ps1
 
 The script compiles against .NET Framework 4.8 and writes `dist\LaserGRBL-Plotter-win.zip`. Unzip it and run `LaserGRBL.exe`. Windows 10 (1903+) and Windows 11 already include the runtime. If [Inno Setup](https://jrsoftware.org/isinfo.php) is installed, compile the existing `setup.iss` after that build to get `install.exe`. A GitHub Actions workflow (`.github/workflows/windows-release.yml`) produces the same zip as an artifact.
 
+Windows 7 needs the other artifact from that workflow, `LaserGRBL-Plotter-win7`. It is built against .NET Framework 4.0 (script: `build\Build-Windows7.ps1`) and does not use the Windows 10 high-DPI startup path. Unzip that archive and run its `LaserGRBL.exe`. Windows 7 needs .NET Framework 4.0 or any newer 4.x already installed, including 4.8.
+
 The drag-knife math is covered by `LaserGRBL.Plotter.Tests` (`dotnet test`).
 
 Defaults match a 1 mm rubber sheet and a measured 3.60 mm blade offset. Change offset and cut speed in the plotter dialog; both are stored. `$32` is left to the machine. Servo, solenoid and Z lift remain in the dialog if a lift is added later.
