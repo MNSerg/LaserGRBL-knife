@@ -47,6 +47,15 @@ namespace LaserGRBL.Plotter
 		FileOrder = 3
 	}
 
+	/// <summary>How the blade offset is applied to a contour.</summary>
+	public enum PlotterCutMode
+	{
+		/// <summary>Tangent offset on curves. An isolated sharp corner swings the holder around the tip.</summary>
+		Swivel = 0,
+		/// <summary>Every sample, including long curves and circles, is shifted along its tangent. A sharp corner is a straight miter, not a swivel arc.</summary>
+		Tangent = 1
+	}
+
 	/// <summary>
 	/// Cutter parameters for a drag knife (passive swivel blade) or a pen.
 	/// Distances are millimetres, speeds are millimetres per minute, angles are degrees.
@@ -81,6 +90,9 @@ namespace LaserGRBL.Plotter
 		public bool OptimizeOrder;
 		public bool InsideFirst;
 		public PlotterRouteMode RouteMode;
+		public PlotterCutMode CutMode;
+		/// <summary>Distance between tangent samples in <see cref="PlotterCutMode.Tangent"/>.</summary>
+		public double TangentStepMm;
 		public int Passes;
 		public bool LinearizeArcs;
 		public double ArcStepDeg;
@@ -119,6 +131,8 @@ namespace LaserGRBL.Plotter
 			c.OptimizeOrder = true;
 			c.InsideFirst = false;
 			c.RouteMode = PlotterRouteMode.Nearest;
+			c.CutMode = PlotterCutMode.Swivel;
+			c.TangentStepMm = 0.25;
 			c.Passes = 1;
 			c.LinearizeArcs = false;
 			c.ArcStepDeg = 10;
@@ -218,6 +232,11 @@ namespace LaserGRBL.Plotter
 			if (CamDown > 3600) CamDown = 3600;
 			int route = (int)RouteMode;
 			if (route < 0 || route > 3) RouteMode = PlotterRouteMode.Nearest;
+			int cut = (int)CutMode;
+			if (cut != (int)PlotterCutMode.Swivel && cut != (int)PlotterCutMode.Tangent)
+				CutMode = PlotterCutMode.Swivel;
+			if (TangentStepMm < 0.02) TangentStepMm = 0.02;
+			if (TangentStepMm > 5) TangentStepMm = 5;
 			OptimizeOrder = RouteMode != PlotterRouteMode.FileOrder;
 			InsideFirst = RouteMode == PlotterRouteMode.InsideOut;
 		}

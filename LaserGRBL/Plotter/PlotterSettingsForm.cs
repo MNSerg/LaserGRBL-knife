@@ -36,6 +36,8 @@ namespace LaserGRBL.Plotter
 		private readonly NumericUpDown mCamUp;
 		private readonly NumericUpDown mCamDown;
 		private readonly ComboBox mRoute;
+		private readonly ComboBox mCut;
+		private readonly NumericUpDown mTangentStep;
 		private readonly CheckBox mLinearize;
 		private readonly NumericUpDown mMargin;
 		private readonly NumericUpDown mLaserX;
@@ -65,7 +67,7 @@ namespace LaserGRBL.Plotter
 			ShowInTaskbar = false;
 			AutoScaleMode = AutoScaleMode.Font;
 			Font = SystemFonts.MessageBoxFont;
-			ClientSize = new Size(620, 700);
+			ClientSize = new Size(620, 756);
 			try
 			{
 				BackColor = LaserGRBL.ColorScheme.FormBackColor;
@@ -121,8 +123,8 @@ namespace LaserGRBL.Plotter
 				"Сколько раз обойти контур, прежде чем перейти к следующему."), 1, 30, 0, 1);
 
 			mOffset = PlaceNum(table, 0, Tr("Offset, mm", "Смещение, мм"), Tr(
-				"How far the swivel axis leads the tip. Also the radius of the swing at a sharp corner.",
-				"Насколько ось впереди острия. Это же радиус дуги на остром углу."), 0, 20, 2, 0.05m);
+				"How far the axis leads the tip. In corner-arc mode this is also the swing radius. In tangent mode the same distance shifts every sample, including curves and circles.",
+				"Насколько ось впереди острия. В режиме «Дуга на угле» это ещё и радиус дуги. В режиме «По касательной» на это же расстояние сдвигается каждая точка, включая кривые и круги."), 0, 20, 2, 0.05m);
 			mOvercut = PlaceNum(table, 2, Tr("Overcut, mm", "Перерез, мм"), Tr(
 				"How far the tip runs past the seam of a closed contour. Keep it about the same as the offset, and shorter than the first side.",
 				"Насколько остриё заходит за шов. Обычно как смещение, и короче первой стороны."), 0, 50, 2, 0.1m);
@@ -131,8 +133,19 @@ namespace LaserGRBL.Plotter
 				"Straight run that lines the blade up before the drawing. It is also a cut.",
 				"Прямой участок, на котором лезвие выравнивается до рисунка. Он тоже режется."), 0, 50, 2, 0.1m);
 			mCorner = PlaceNum(table, 2, Tr("Sharp from, °", "Острый от, °"), Tr(
-				"An isolated corner at least this sharp swings the holder around the tip. Arcs and fillets stay smooth at any threshold.",
-				"Отдельный угол не слабее этого числа получает дугу разворота. Дуги и скругления остаются плавными при любом пороге."), 0, 180, 0, 1);
+				"Corner-arc mode only. An isolated corner at least this sharp swings the holder around the tip. Arcs and fillets stay smooth at any threshold.",
+				"Только для режима «Дуга на угле». Отдельный угол не слабее этого числа получает дугу разворота. Дуги и скругления остаются плавными при любом пороге."), 0, 180, 0, 1);
+
+			mCut = PlaceCombo(table, Tr("Cut shape", "Форма реза"), Tr(
+				"Corner arc: the holder swings around the tip at an isolated sharp corner. Along the tangent: every sample, including long curves and circles, is shifted along its tangent, and a sharp corner is a short straight join instead of a swing. With lead-in and overcut equal to the offset, the start sits two offsets behind and the end runs two offsets past, the same proportions as a tangent script scaled for a small blade.",
+				"Дуга на угле: на отдельном остром угле держатель обходит остриё дугой. По касательной: каждая точка, в том числе на длинной кривой и на круге, сдвигается вдоль касательной, а острый угол — короткий прямой переход, без дуги. Если заход и перерез равны смещению, начало торчит на два смещения назад, конец — на два смещения вперёд."));
+			mCut.Items.Add(new CutItem(PlotterCutMode.Swivel, Tr("Corner arc", "Дуга на угле")));
+			mCut.Items.Add(new CutItem(PlotterCutMode.Tangent, Tr("Along the tangent", "По касательной")));
+			mCut.SelectedIndexChanged += CutModeChanged;
+			mCut.DropDownWidth = 360;
+			mTangentStep = PlaceNum(table, 0, Tr("Tangent step, mm", "Шаг касательной, мм"), Tr(
+				"Along the tangent only. How often the tangent is sampled. Smaller follows a curve more tightly. A turn under 20° stays one point, a sharper turn is the straight join.",
+				"Только для режима «По касательной». Как часто брать касательную. Меньше — кривая повторяется плотнее. Поворот слабее 20° остаётся одной точкой, круче — прямой переход."), 0.02m, 5, 2, 0.05m);
 
 			mSimplify = PlaceNum(table, 0, Tr("Simplify, mm", "Упрощение, мм"), Tr(
 				"Removes wobble smaller than this before the blade offset is applied. Too much turns a fillet into one sharp corner.",
@@ -303,9 +316,26 @@ namespace LaserGRBL.Plotter
 			Set(mCamUp, (decimal)cfg.CamUp);
 			Set(mCamDown, (decimal)cfg.CamDown);
 			SelectRoute(cfg.RouteMode);
+			SelectCut(cfg.CutMode);
+			Set(mTangentStep, (decimal)cfg.TangentStepMm);
 			mLinearize.Checked = cfg.LinearizeArcs;
 			mLoading = false;
 			UpdatePenFields();
+			UpdateCutFields();
+		}
+
+		private void CutModeChanged(object sender, EventArgs e)
+		{
+			if (!mLoading)
+				UpdateCutFields();
+		}
+
+		private void UpdateCutFields()
+		{
+			bool tangent = mCut.SelectedItem != null && ((CutItem)mCut.SelectedItem).Mode == PlotterCutMode.Tangent;
+			mCorner.Enabled = !tangent;
+			mLinearize.Enabled = !tangent;
+			mTangentStep.Enabled = tangent;
 		}
 
 		private void PenModeChanged(object sender, EventArgs e)
@@ -363,6 +393,8 @@ namespace LaserGRBL.Plotter
 			cfg.CamUp = (double)mCamUp.Value;
 			cfg.CamDown = (double)mCamDown.Value;
 			cfg.RouteMode = ((RouteItem)mRoute.SelectedItem).Mode;
+			cfg.CutMode = mCut.SelectedItem == null ? PlotterCutMode.Swivel : ((CutItem)mCut.SelectedItem).Mode;
+			cfg.TangentStepMm = (double)mTangentStep.Value;
 			cfg.LinearizeArcs = mLinearize.Checked;
 			return cfg;
 		}
@@ -424,6 +456,18 @@ namespace LaserGRBL.Plotter
 				if (((ZLiftItem)mZLift.Items[i]).Mode == mode)
 				{
 					mZLift.SelectedIndex = i;
+					return;
+				}
+			}
+		}
+
+		private void SelectCut(PlotterCutMode mode)
+		{
+			for (int i = 0; i < mCut.Items.Count; i++)
+			{
+				if (((CutItem)mCut.Items[i]).Mode == mode)
+				{
+					mCut.SelectedIndex = i;
 					return;
 				}
 			}
@@ -570,6 +614,18 @@ namespace LaserGRBL.Plotter
 			public PlotterZLift Mode;
 			private readonly string mText;
 			public ZLiftItem(PlotterZLift mode, string text)
+			{
+				Mode = mode;
+				mText = text;
+			}
+			public override string ToString() { return mText; }
+		}
+
+		private sealed class CutItem
+		{
+			public PlotterCutMode Mode;
+			private readonly string mText;
+			public CutItem(PlotterCutMode mode, string text)
 			{
 				Mode = mode;
 				mText = text;

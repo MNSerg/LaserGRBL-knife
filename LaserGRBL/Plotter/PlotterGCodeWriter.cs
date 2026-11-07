@@ -13,7 +13,7 @@ namespace LaserGRBL.Plotter
 		{
 			StringBuilder sb = new StringBuilder();
 			sb.Append("(LaserGRBL plotter drag-knife)\r\n");
-			sb.Append("(preview is the swivel axis; the blade tip follows the design)\r\n");
+			sb.Append("(preview is the blade axis; the tip follows the design)\r\n");
 			sb.Append("(blade ").Append(Safe(cfg.BladeName));
 			sb.Append(" offset ").Append(PlotGeom.Num(cfg.BladeOffsetMm));
 			sb.Append(" mm overcut ").Append(PlotGeom.Num(cfg.OvercutMm));
@@ -25,6 +25,10 @@ namespace LaserGRBL.Plotter
 			else sb.Append("F").Append(cfg.TravelSpeed.ToString(System.Globalization.CultureInfo.InvariantCulture));
 			sb.Append(" paths ").Append(pathCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
 			sb.Append(" pen ").Append(cfg.PenMode.ToString()).Append(")\r\n");
+			if (cfg.CutMode == PlotterCutMode.Tangent)
+				sb.Append("(tangent cut: the axis leads the tip along the tangent on curves and circles, sharp corners are straight miters)\r\n");
+			else
+				sb.Append("(swivel cut: curves stay on the tangent, an isolated sharp corner swings around the tip)\r\n");
 			if (cfg.PenMode == PlotterPenMode.ZAxis && cfg.ZLift == PlotterZLift.Cam)
 			{
 				sb.Append("(z cam, turn Z").Append(PlotGeom.Num(cfg.CamDown));

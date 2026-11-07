@@ -62,6 +62,8 @@ namespace LaserGRBL.Plotter
 			}
 			else
 				cfg.RouteMode = (PlotterRouteMode)routeStored;
+			cfg.CutMode = (PlotterCutMode)LaserGRBL.Settings.GetObject("Plotter.CutMode", (int)def.CutMode);
+			cfg.TangentStepMm = LaserGRBL.Settings.GetObject("Plotter.TangentStepMm", def.TangentStepMm);
 			cfg.Passes = LaserGRBL.Settings.GetObject("Plotter.Passes", def.Passes);
 			cfg.LinearizeArcs = LaserGRBL.Settings.GetObject("Plotter.LinearizeArcs", def.LinearizeArcs);
 			cfg.ArcStepDeg = LaserGRBL.Settings.GetObject("Plotter.ArcStepDeg", def.ArcStepDeg);
@@ -101,6 +103,8 @@ namespace LaserGRBL.Plotter
 			LaserGRBL.Settings.SetObject("Plotter.CamUp", cfg.CamUp);
 			LaserGRBL.Settings.SetObject("Plotter.CamDown", cfg.CamDown);
 			LaserGRBL.Settings.SetObject("Plotter.RouteMode", (int)cfg.RouteMode);
+			LaserGRBL.Settings.SetObject("Plotter.CutMode", (int)cfg.CutMode);
+			LaserGRBL.Settings.SetObject("Plotter.TangentStepMm", cfg.TangentStepMm);
 			LaserGRBL.Settings.SetObject("Plotter.OptimizeOrder", cfg.RouteMode != PlotterRouteMode.FileOrder);
 			LaserGRBL.Settings.SetObject("Plotter.InsideFirst", cfg.RouteMode == PlotterRouteMode.InsideOut);
 			LaserGRBL.Settings.SetObject("Plotter.Passes", cfg.Passes);

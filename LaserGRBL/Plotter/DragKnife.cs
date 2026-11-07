@@ -7,14 +7,16 @@ using System.Collections.Generic;
 namespace LaserGRBL.Plotter
 {
 	/// <summary>
-	/// Drag-knife compensation. The machine XY is the swivel axis.
-	/// The blade tip trails that axis by <see cref="PlotterConfig.BladeOffsetMm"/>.
-	/// Along a straight, an arc or a fillet the axis stays ahead of the tip on the
-	/// tangent, so the curve is not broken into sideways steps. A fillet is a run
-	/// of similar bends, even when each sample step is steeper than the corner
-	/// threshold. Only an isolated corner sharper than
-	/// <see cref="PlotterConfig.CornerThresholdDeg"/> swings the holder around the tip.
-	/// A lead-in aligns the blade before the design, and an overcut closes the seam.
+	/// Drag-knife compensation. The machine XY is the blade axis and the tip trails
+	/// it by <see cref="PlotterConfig.BladeOffsetMm"/>.
+	/// <see cref="PlotterCutMode.Swivel"/> keeps the axis on the tangent along a
+	/// straight, an arc or a fillet, and swings the holder around the tip only at
+	/// an isolated corner sharper than <see cref="PlotterConfig.CornerThresholdDeg"/>.
+	/// <see cref="PlotterCutMode.Tangent"/> shifts every sample along its tangent,
+	/// including long curves and circles, and joins a sharp corner with a straight
+	/// miter. The first sample sits behind the start by the lead-in plus the offset
+	/// (twice the offset when they are equal). The last sample runs past the end
+	/// by the offset plus the overcut.
 	/// </summary>
 	public static class DragKnife
 	{
@@ -77,6 +79,12 @@ namespace LaserGRBL.Plotter
 
 		private static void Emit(PlotPath path, PlotterConfig cfg, List<PlotMove> moves, IList<PlotPath> obstacles, ref PlotPoint cursor)
 		{
+			if (cfg.CutMode == PlotterCutMode.Tangent)
+			{
+				EmitTangent(path, cfg, moves, obstacles, ref cursor);
+				return;
+			}
+
 			List<PlotPoint> pts = Compact(path.Points);
 			if (pts.Count < 2)
 				return;
@@ -164,6 +172,135 @@ namespace LaserGRBL.Plotter
 				PlotMove last = moves[moves.Count - 1];
 				cursor = new PlotPoint(last.X, last.Y);
 			}
+		}
+
+		/// <summary>
+		/// Tangent offset sampled along the path. A turn under 20° keeps one sample
+		/// on the angle bisector, so a circle stays smooth and the axis lies on
+		/// radius sqrt(R^2 + offset^2). A sharper turn emits the incoming and the
+		/// outgoing tangent and joins them with a straight miter, not a swivel arc.
+		/// </summary>
+		private static void EmitTangent(PlotPath path, PlotterConfig cfg, List<PlotMove> moves, IList<PlotPath> obstacles, ref PlotPoint cursor)
+		{
+			List<PlotPoint> pts = Compact(path.Points);
+			if (pts.Count < 2)
+				return;
+
+			bool closed = path.Closed && pts.Count >= 3;
+			int segCount = closed ? pts.Count : pts.Count - 1;
+			PlotPoint[] dir = new PlotPoint[segCount];
+			for (int s = 0; s < segCount; s++)
+			{
+				PlotPoint a = pts[s];
+				PlotPoint b = pts[(s + 1) % pts.Count];
+				dir[s] = PlotGeom.Normalize(PlotGeom.Sub(b, a));
+				if (dir[s].X == 0 && dir[s].Y == 0)
+					return;
+			}
+
+			double step = cfg.TangentStepMm;
+			if (step < 0.02) step = 0.02;
+			if (step > 5) step = 5;
+
+			List<PlotPoint> samples = new List<PlotPoint>();
+			List<PlotPoint> tangents = new List<PlotPoint>();
+			for (int s = 0; s < segCount; s++)
+			{
+				PlotPoint a = pts[s];
+				if (s == 0)
+				{
+					samples.Add(a);
+					tangents.Add(dir[s]);
+				}
+				else
+					AddTangentVertex(samples, tangents, a, dir[s - 1], dir[s]);
+
+				double length = PlotGeom.Dist(a, pts[(s + 1) % pts.Count]);
+				int pieces = (int)Math.Floor(length / step);
+				for (int k = 1; k <= pieces; k++)
+				{
+					double d = k * step;
+					if (d >= length - 0.0001)
+						break;
+					samples.Add(new PlotPoint(a.X + dir[s].X * d, a.Y + dir[s].Y * d));
+					tangents.Add(dir[s]);
+				}
+			}
+			if (!closed)
+			{
+				PlotPoint end = pts[pts.Count - 1];
+				if (samples.Count == 0 || PlotGeom.Dist(samples[samples.Count - 1], end) > 0.0001)
+				{
+					samples.Add(end);
+					tangents.Add(dir[segCount - 1]);
+				}
+			}
+			if (samples.Count == 0)
+				return;
+
+			double offset = cfg.BladeOffsetMm;
+			double lead = cfg.LeadInMm;
+			double over = cfg.OvercutMm;
+			PlotPoint first = TangentShift(samples[0], tangents[0], offset, lead, over, 0, samples.Count);
+			if (cfg.KnifeStaysDown)
+			{
+				double margin = lead;
+				if (offset > margin)
+					margin = offset;
+				if (margin < 1)
+					margin = 1;
+				List<PlotPoint> route = SafeRoute.Route(cursor, first, obstacles, margin);
+				PlotPoint at = cursor;
+				for (int r = 0; r < route.Count; r++)
+				{
+					if (PlotGeom.Dist(at, route[r]) <= 0.0001)
+						continue;
+					Travel(moves, route[r]);
+					at = route[r];
+				}
+			}
+			else
+			{
+				Travel(moves, first);
+			}
+
+			for (int i = 0; i < samples.Count; i++)
+				Line(moves, TangentShift(samples[i], tangents[i], offset, lead, over, i, samples.Count));
+
+			if (moves.Count > 0)
+			{
+				PlotMove last = moves[moves.Count - 1];
+				cursor = new PlotPoint(last.X, last.Y);
+			}
+		}
+
+		private static void AddTangentVertex(List<PlotPoint> samples, List<PlotPoint> tangents, PlotPoint vertex, PlotPoint incoming, PlotPoint outgoing)
+		{
+			if (samples.Count == 0 || PlotGeom.Dist(samples[samples.Count - 1], vertex) > 0.0001)
+			{
+				samples.Add(vertex);
+				tangents.Add(incoming);
+			}
+			else
+				tangents[tangents.Count - 1] = incoming;
+
+			if (TurnDegrees(incoming, outgoing) >= 20)
+			{
+				samples.Add(vertex);
+				tangents.Add(outgoing);
+			}
+			else
+				tangents[tangents.Count - 1] = Bisector(incoming, outgoing);
+		}
+
+		private static PlotPoint TangentShift(PlotPoint point, PlotPoint tangent, double offset, double lead, double over, int index, int count)
+		{
+			double scale = offset;
+			if (index == 0)
+				scale = -(lead + offset);
+			else if (index == count - 1)
+				scale = offset + over;
+			return Shift(point, tangent, scale);
 		}
 
 		private static PlotPoint Next(List<PlotPoint> pts, int index, bool closed)

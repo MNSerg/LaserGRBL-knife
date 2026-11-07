@@ -672,6 +672,93 @@ M5";
 		}
 
 		[Fact]
+		public void Tangent_square_miters_the_corner_without_a_swivel()
+		{
+			PlotterConfig cfg = Knife();
+			cfg.CutMode = PlotterCutMode.Tangent;
+			cfg.BladeOffsetMm = 3.6;
+			cfg.LeadInMm = 3.6;
+			cfg.OvercutMm = 3.6;
+			cfg.TangentStepMm = 5;
+			List<PlotMove> moves = DragKnife.Build(new[] { Square() }, cfg);
+			string gcode = PlotterGCodeWriter.Write(moves, cfg, 1);
+			Assert.Contains("tangent cut", gcode);
+			Assert.DoesNotContain("G2", gcode);
+			Assert.DoesNotContain("G3", gcode);
+
+			double want = 3.6 * Math.Sqrt(2);
+			bool miter = false;
+			for (int i = 1; i < moves.Count; i++)
+			{
+				if (!moves[i].Cut || !moves[i - 1].Cut)
+					continue;
+				double dx = moves[i].X - moves[i - 1].X;
+				double dy = moves[i].Y - moves[i - 1].Y;
+				if (Math.Abs(dx) < 1 || Math.Abs(dy) < 1)
+					continue;
+				double len = Math.Sqrt(dx * dx + dy * dy);
+				if (Math.Abs(len - want) < 0.05)
+					miter = true;
+			}
+			Assert.True(miter);
+		}
+
+		[Fact]
+		public void Tangent_circle_shifts_along_the_tangent()
+		{
+			PlotterConfig cfg = Knife();
+			cfg.CutMode = PlotterCutMode.Tangent;
+			cfg.BladeOffsetMm = 3.6;
+			cfg.LeadInMm = 0;
+			cfg.OvercutMm = 0;
+			cfg.TangentStepMm = 5;
+			PlotPath circle = new PlotPath();
+			circle.Closed = true;
+			for (int i = 0; i < 36; i++)
+			{
+				double a = 2 * Math.PI * i / 36;
+				circle.Points.Add(new PlotPoint(20 * Math.Cos(a), 20 * Math.Sin(a)));
+			}
+			List<PlotMove> moves = DragKnife.Build(new[] { circle }, cfg);
+			string gcode = PlotterGCodeWriter.Write(moves, cfg, 1);
+			Assert.DoesNotContain("G2", gcode);
+			Assert.DoesNotContain("G3", gcode);
+			double want = Math.Sqrt(20 * 20 + 3.6 * 3.6);
+			int seen = 0;
+			for (int i = 0; i < moves.Count; i++)
+			{
+				if (!moves[i].Cut)
+					continue;
+				double radius = Math.Sqrt(moves[i].X * moves[i].X + moves[i].Y * moves[i].Y);
+				Assert.True(Math.Abs(radius - want) < 0.15, radius.ToString());
+				seen++;
+			}
+			Assert.True(seen >= 30);
+		}
+
+		[Fact]
+		public void Tangent_open_line_starts_behind_and_finishes_past()
+		{
+			PlotterConfig cfg = Knife();
+			cfg.CutMode = PlotterCutMode.Tangent;
+			cfg.BladeOffsetMm = 3.6;
+			cfg.LeadInMm = 3.6;
+			cfg.OvercutMm = 3.6;
+			cfg.TangentStepMm = 5;
+			PlotPath line = new PlotPath();
+			line.Points.Add(new PlotPoint(0, 0));
+			line.Points.Add(new PlotPoint(10, 0));
+			List<PlotMove> moves = DragKnife.Build(new[] { line }, cfg);
+			Assert.Equal(-7.2, moves[0].X, 3);
+			Assert.Equal(0, moves[0].Y, 3);
+			Assert.False(moves[0].Cut);
+			PlotMove last = moves[moves.Count - 1];
+			Assert.Equal(17.2, last.X, 3);
+			Assert.Equal(0, last.Y, 3);
+			Assert.True(last.Cut);
+		}
+
+		[Fact]
 		public void Manual_height_emits_xy_only_at_cut_speed()
 		{
 			PlotterConfig cfg = PlotterConfig.CreateDefault();

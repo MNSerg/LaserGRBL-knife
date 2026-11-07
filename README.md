@@ -13,7 +13,7 @@ Open **Grbl → Plotter...** (Плоттер...). The machine this mode is set u
 
 **File → Apply plotter to loaded file** runs the same compensation on G-code that is already open. Do not run it twice on the same file.
 
-**Grbl → Settings**, tab Options (Параметры in Russian): **Autostart** launches the program with Windows, full screen. In the plotter dialog, Knife → Z axis has two lifts. Standard: the stepper raises and lowers the blade. Cam: the motor is turned on its side and a cam pushes the head down by the set turn; springs lift the blade when the cam releases. With either lift, travel between contours is a straight move while the knife is up. Manual height still keeps the knife down and walks around closed contours.
+**Grbl → Settings**, tab Options (Параметры in Russian): **Autostart** launches the program with Windows, full screen. In the plotter dialog, Knife → Z axis has two lifts. Standard: the stepper raises and lowers the blade. Cam: the motor is turned on its side and a cam pushes the head down by the set turn; springs lift the blade when the cam releases. With either lift, travel between contours is a straight move while the knife is up. Manual height still keeps the knife down and walks around closed contours. Cut shape is either a corner arc (the holder swings around the tip) or a tangent offset (every sample, including curves and circles, shifts along the tangent, and a sharp corner is a short straight join).
 
 Build on Windows (Visual Studio 2022 with the .NET desktop workload):
 
