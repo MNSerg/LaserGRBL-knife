@@ -1,0 +1,79 @@
+name: Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build LaserGRBL
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+          if (-not $msbuild) { throw "MSBuild not found" }
+          & $msbuild LaserGRBL\LaserGRBL.csproj /p:Configuration=Release /p:TargetFrameworkVersion=v4.8 /p:Platform=AnyCPU /v:m
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Zip the program
+        shell: pwsh
+        run: |
+          $dest = "dist/LaserGRBL-Plotter"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item LaserGRBL\bin\Release\* $dest -Recurse -Force
+          Compress-Archive -Path $dest -DestinationPath dist/LaserGRBL-Plotter-win.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LaserGRBL-Plotter-win
+          path: dist/LaserGRBL-Plotter-win.zip
+
+      # Separate output folder and reference assemblies, so this cannot overwrite the 4.8 zip above.
+      # Targeting v4.0 keeps the process off the .NET 4.7+ DPI startup path, which crashes on Windows 7.
+      - name: Build for Windows 7
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+          if (-not $msbuild) { throw "MSBuild not found" }
+
+          $pkgRoot = Join-Path $env:TEMP "net40-refs"
+          New-Item -ItemType Directory -Force -Path $pkgRoot | Out-Null
+          $nupkg = Join-Path $pkgRoot "refs.zip"
+          Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.NETFramework.ReferenceAssemblies.net40/1.0.3" -OutFile $nupkg
+          $pkg = Join-Path $pkgRoot "pkg"
+          Expand-Archive -Path $nupkg -DestinationPath $pkg -Force
+          $targets = Join-Path $pkg "build\Microsoft.NETFramework.ReferenceAssemblies.net40.targets"
+          $framework = Join-Path $pkg "build\.NETFramework\v4.0"
+          if (-not (Test-Path (Join-Path $framework "mscorlib.dll"))) { throw "Reference assemblies were not unpacked: $framework" }
+
+          & $msbuild LaserGRBL\LaserGRBL.csproj `
+            /p:Configuration=Release `
+            /p:Platform=AnyCPU `
+            /p:TargetFrameworkVersion=v4.0 `
+            /p:OutputPath=bin\Release-win7\ `
+            /p:IntermediateOutputPath=obj\Release-win7\ `
+            /p:FrameworkPathOverride=$framework `
+            /p:Win7Net40Targets=$targets `
+            /v:m
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Zip the Windows 7 program
+        shell: pwsh
+        run: |
+          $dest = "dist/LaserGRBL-Plotter-win7"
+          if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item LaserGRBL\bin\Release-win7\* $dest -Recurse -Force
+          Compress-Archive -Path $dest -DestinationPath dist/LaserGRBL-Plotter-win7.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LaserGRBL-Plotter-win7
+          path: dist/LaserGRBL-Plotter-win7.zip

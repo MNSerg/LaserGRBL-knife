@@ -93,7 +93,11 @@ namespace ExCSS
                 if (!started)
                 {
                     started = true;
+#if NET40
+                    task = Task.Factory.StartNew(() => Kernel());
+#else
                     task = Task.Run(() => Kernel());
+#endif
                 }
                 else if (task == null)
                     throw new InvalidOperationException("The parser has already run synchronously.");

@@ -3,6 +3,32 @@ Official website [http://lasergrbl.com](http://lasergrbl.com)
 
 LaserGRBL is a Windows GUI for [GRBL](https://github.com/gnea/grbl/wiki). Unlike other GUI LaserGRBL it is specifically developed for use with laser cutter and engraver. In order to use all of LaserGRBL feature, your engraver must supports laser power modulation through gcode "S" command. LaserGRBL is compatible with [Grbl v0.9](https://github.com/grbl/grbl/) and [Grbl v1.1](https://github.com/gnea/grbl/)
 
+### Plotter mode (drag knife)
+
+This copy can drive a laser that was converted into a plotter with a passive swivel blade. Laser jobs are unchanged until plotter mode is turned on.
+
+A plain-language guide to every plotter setting, with pictures: [docs/plotter-nastroiki.md](docs/plotter-nastroiki.md).
+
+Open **Grbl → Plotter...** (Плоттер...). The machine this mode is set up for has no Z axis: blade height is set by hand before the job, and the program sends only X and Y. Default blade offset is 3.60 mm (editable), overcut and lead-in match it, cut speed starts at 600 mm/min (editable in the same dialog and in the import window), one pass. A move between separate contours also cuts, because the knife stays down, so every XY move is G1 at cut speed. Aim the positioning laser (10 mm to the right of the blade, adjustable) at the bottom-left corner of the sheet and zero XY. The program then parks the blade 20 mm outside that corner, to the left and toward you, and only after that travels into the first contour. Hatch fill is not generated. Vectorize keeps outlines and holes; Centerline keeps stroke lines. DXF files (ASCII) open from the same File dialog as SVG: LINE, LWPOLYLINE, POLYLINE, ARC, CIRCLE, ELLIPSE, SPLINE and block INSERT.
+
+**File → Apply plotter to loaded file** runs the same compensation on G-code that is already open. Do not run it twice on the same file.
+
+**Grbl → Settings**, tab Options (Параметры in Russian): **Autostart** launches the program with Windows, full screen. In the plotter dialog, Knife → Z axis has two lifts. Standard: the stepper raises and lowers the blade. Cam: the motor is turned on its side and a cam pushes the head down by the set turn; springs lift the blade when the cam releases. With either lift, travel between contours is a straight move while the knife is up. Manual height still keeps the knife down and walks around closed contours. Cut shape is either a corner arc (the holder swings around the tip) or a tangent offset (every sample, including curves and circles, shifts along the tangent, and a sharp corner is a short straight join).
+
+Build on Windows (Visual Studio 2022 with the .NET desktop workload):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build\Build-Windows.ps1
+```
+
+The script compiles against .NET Framework 4.8 and writes `dist\LaserGRBL-Plotter-win.zip`. Unzip it and run `LaserGRBL.exe`. Windows 10 (1903+) and Windows 11 already include the runtime. If [Inno Setup](https://jrsoftware.org/isinfo.php) is installed, compile the existing `setup.iss` after that build to get `install.exe`. A GitHub Actions workflow (`.github/workflows/windows-release.yml`) produces the same zip as an artifact.
+
+Windows 7 needs the other artifact from that workflow, `LaserGRBL-Plotter-win7`. It is built against .NET Framework 4.0 (script: `build\Build-Windows7.ps1`) and does not use the Windows 10 high-DPI startup path. Unzip that archive and run its `LaserGRBL.exe`. Windows 7 needs .NET Framework 4.0 or any newer 4.x already installed, including 4.8.
+
+The drag-knife math is covered by `LaserGRBL.Plotter.Tests` (`dotnet test`).
+
+Defaults match a 1 mm rubber sheet and a measured 3.60 mm blade offset. Change offset and cut speed in the plotter dialog; both are stored. `$32` is left to the machine. Servo, solenoid and Z lift remain in the dialog if a lift is added later.
+
 All downloads available at https://github.com/arkypita/LaserGRBL/releases
 
 ### Support and Donation
@@ -17,7 +43,7 @@ Do you like LaserGRBL? Support development with your donation!
 - Image import (jpg, bmp...) with line by line GCode generation (horizontal, vertical, and diagonal).
 - Image import (jpg, bmp...) with Vectorization!
 - Image import (jpg, bmp...) with 1bit dithering, best result with low power laser
-- Vector file import (svg only) [Experimental]
+- Vector file import (svg, and DXF in plotter mode) [Experimental]
 - Different color scheme optimized for different safety glasses
 - User defined buttons, power to you!
 - Grbl Configuration Import/Export

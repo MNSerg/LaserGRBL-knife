@@ -120,6 +120,15 @@ namespace LaserGRBL.RasterConverter
 			InitImageSize();
 
 			IIBorderTracing.CurrentValue = IP.BorderSpeed = Settings.GetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", 1000);
+			if (Plotter.PlotterSettings.IsEnabled && (IP.SelectedTool == ImageProcessor.Tool.Vectorize || IP.SelectedTool == ImageProcessor.Tool.Centerline))
+			{
+				IIBorderTracing.CurrentValue = IP.BorderSpeed = Plotter.PlotterSettings.Load().CutSpeed;
+				IIMaxPower.Enabled = false;
+				IIMinPower.Enabled = false;
+				CBLaserON.Enabled = false;
+				LblBorderTracing.Text = Plotter.PlotterSettingsForm.Tr("Cut speed", "Скорость реза");
+				Text = Plotter.PlotterSettingsForm.Tr("Plotter size and speed", "Плоттер: размер и скорость");
+			}
 			IILinearFilling.CurrentValue = IP.MarkSpeed = Settings.GetObject("GrayScaleConversion.Gcode.Speed.Mark", 1000);
 
 			IP.LaserOn = Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.LaserOn", "M3");

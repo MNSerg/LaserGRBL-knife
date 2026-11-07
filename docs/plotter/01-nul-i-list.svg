@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
+  <rect width="900" height="560" fill="#fbf7f1"/>
+  <text x="24" y="34" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#2c2416">1. Куда встаёт нож до первого реза</text>
+  <text x="24" y="58" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#5c5146">Цифры — миллиметры при настройках по умолчанию. Плюс X вправо, плюс Y от вас, в глубину листа.</text>
+
+  <rect x="360" y="78" width="420" height="270" fill="#efe4d2" stroke="#b7a48a" stroke-width="2"/>
+  <text x="620" y="112" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#8a7358">лист</text>
+
+  <rect x="360" y="168" width="240" height="180" fill="#f7fbff" stroke="#1d4e89" stroke-width="3"/>
+  <text x="440" y="268" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#1d4e89">рисунок</text>
+
+  <g stroke="#c4372f" stroke-width="2" fill="none">
+    <circle cx="360" cy="348" r="8" fill="#c4372f"/>
+    <line x1="360" y1="328" x2="360" y2="368"/>
+    <line x1="340" y1="348" x2="380" y2="348"/>
+  </g>
+  <text x="392" y="372" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#c4372f">лазер на углу листа</text>
+  <text x="392" y="392" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#5c5146">координата угла: X+10, Y0</text>
+
+  <circle cx="300" cy="348" r="9" fill="#1f8a4c" stroke="#145c34" stroke-width="2"/>
+  <line x1="300" y1="348" x2="352" y2="348" stroke="#1f8a4c" stroke-width="2" stroke-dasharray="4 3"/>
+  <text x="292" y="336" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#145c34">10 мм</text>
+  <text x="150" y="334" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#145c34">ноль XY</text>
+  <text x="150" y="354" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#5c5146">здесь ось лезвия</text>
+
+  <rect x="188" y="448" width="24" height="24" fill="#6d4ca8"/>
+  <text x="24" y="458" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#6d4ca8">парковка</text>
+  <text x="24" y="478" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#5c5146">X−10 и Y−20</text>
+  <path d="M300 366 L212 456" fill="none" stroke="#6d4ca8" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="228" y="430" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#6d4ca8">1. сначала сюда</text>
+
+  <path d="M188 470 C 70 470, 70 348, 348 348" fill="none" stroke="#e07a2f" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="28" y="400" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#c45c26">2. потом в угол рисунка</text>
+
+  <text x="24" y="516" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#2c2416">Вы стоите снизу рисунка. Схема не в масштабе, числа — настоящие миллиметры.</text>
+  <text x="24" y="540" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#2c2416">Парковка левее угла на 20 мм и ближе к вам на те же 20 мм. На лист нож заезжает уже после неё.</text>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0 0 L6 3 L0 6 Z" fill="#2c2416"/>
+    </marker>
+  </defs>
+</svg>

@@ -31,6 +31,8 @@ namespace LaserGRBL
 		private bool PromptForWiFiShown;
 		private readonly string[] args;
 		private readonly List<ToolStripMenuItem> mLineWidthMenu;
+		private ToolStripMenuItem mApplyPlotterItem;
+		private string mBaseCaption;
 
 
         public MainForm()
@@ -103,6 +105,8 @@ namespace LaserGRBL
             nightyToolStripMenuItem.Tag = Scheme.Nighty;
 
             CheckLineWidthItem();
+			InstallPlotterMenu();
+			SettingsForm.SettingsChanged += OnSettingsChanged;
 
 			MnGrblConfig.Visible = Core.UIShowGrblConfig;
 			MnUnlock.Visible = Core.UIShowUnlockButtons;
@@ -301,15 +305,10 @@ namespace LaserGRBL
 					GitHub.CheckVersion(false);
 
 				SuspendLayout();
-				//restore last size and position
-				Object[] msp = Settings.GetObject<Object[]>("Mainform Size and Position", null);
-				FormWindowState state = msp == null ? FormWindowState.Maximized : (FormWindowState)msp[2] != FormWindowState.Minimized ? (FormWindowState)msp[2] : FormWindowState.Maximized;
-				if (state == FormWindowState.Normal)
-				{ WindowState = state; Size = (Size)msp[0]; Location = (Point)msp[1]; }
-
-				if (!IsVisibleOnAnyScreen(new Rectangle(Location, Size))) //ensure form is visible if stored position is no longer valid on current screen configuration
-				{ WindowState = FormWindowState.Normal; Size = new Size(1024, 768); CenterToScreen(); }
-
+				if (AutoStart.IsEnabled)
+					EnterFullScreen();
+				else
+					RestoreWindowPlacement();
 				ResumeLayout();
 
 				ManageMessage();
@@ -319,6 +318,47 @@ namespace LaserGRBL
 			{
 				Close();
 			}
+		}
+
+		private bool mFullScreen;
+
+		private void OnSettingsChanged(object sender, EventArgs e)
+		{
+			if (AutoStart.IsEnabled)
+				EnterFullScreen();
+			else if (mFullScreen)
+				LeaveFullScreen();
+		}
+
+		private void EnterFullScreen()
+		{
+			mFullScreen = true;
+			FormBorderStyle = FormBorderStyle.None;
+			WindowState = FormWindowState.Normal;
+			Screen screen = Screen.FromControl(this);
+			if (screen == null)
+				screen = Screen.PrimaryScreen;
+			Bounds = screen.Bounds;
+			WindowState = FormWindowState.Maximized;
+		}
+
+		private void LeaveFullScreen()
+		{
+			mFullScreen = false;
+			FormBorderStyle = FormBorderStyle.Sizable;
+			WindowState = FormWindowState.Maximized;
+		}
+
+		private void RestoreWindowPlacement()
+		{
+				//restore last size and position
+				Object[] msp = Settings.GetObject<Object[]>("Mainform Size and Position", null);
+				FormWindowState state = msp == null ? FormWindowState.Maximized : (FormWindowState)msp[2] != FormWindowState.Minimized ? (FormWindowState)msp[2] : FormWindowState.Maximized;
+				if (state == FormWindowState.Normal)
+				{ WindowState = state; Size = (Size)msp[0]; Location = (Point)msp[1]; }
+
+				if (!IsVisibleOnAnyScreen(new Rectangle(Location, Size))) //ensure form is visible if stored position is no longer valid on current screen configuration
+				{ WindowState = FormWindowState.Normal; Size = new Size(1024, 768); CenterToScreen(); }
 		}
 
 		public bool IsVisibleOnAnyScreen(Rectangle rect)
@@ -436,7 +476,8 @@ namespace LaserGRBL
 			{
 				SincroStart.StopListen();
 				Core.Exiting();
-				Settings.SetObject("Mainform Size and Position", new object[] { Size, Location, WindowState });
+				if (!mFullScreen)
+					Settings.SetObject("Mainform Size and Position", new object[] { Size, Location, WindowState });
 				Settings.Exiting();
 
 				UsageStats.SaveFile(Core);
@@ -870,6 +911,50 @@ namespace LaserGRBL
 			MnFileOpen.Enabled = Core.CanLoadNewFile;
 			MnFileAppend.Enabled = Core.CanLoadNewFile;
 			MnReOpenFile.Enabled = Core.CanReOpenFile;
+			if (mApplyPlotterItem != null)
+				mApplyPlotterItem.Enabled = Core.CanLoadNewFile && Core.LoadedFile != null && Core.LoadedFile.Count > 0;
+		}
+
+		private void InstallPlotterMenu()
+		{
+			mBaseCaption = Text;
+			ToolStripMenuItem plotterItem = new ToolStripMenuItem(Plotter.PlotterSettingsForm.Tr("Plotter...", "Плоттер..."));
+			plotterItem.Click += delegate
+			{
+				if (Plotter.PlotterSettingsForm.Edit(this))
+					RefreshPlotterCaption();
+			};
+			int settingsIndex = MnGrbl.DropDownItems.IndexOf(settingsToolStripMenuItem);
+			if (settingsIndex < 0)
+				settingsIndex = MnGrbl.DropDownItems.Count;
+			MnGrbl.DropDownItems.Insert(settingsIndex, plotterItem);
+
+			mApplyPlotterItem = new ToolStripMenuItem(Plotter.PlotterSettingsForm.Tr("Apply plotter to loaded file", "Применить плоттер к загруженному файлу"));
+			mApplyPlotterItem.Click += ApplyPlotterToLoadedFile;
+			fileToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
+			fileToolStripMenuItem.DropDownItems.Add(mApplyPlotterItem);
+			RefreshPlotterCaption();
+		}
+
+		private void RefreshPlotterCaption()
+		{
+			if (string.IsNullOrEmpty(mBaseCaption))
+				return;
+			Text = Plotter.PlotterSettings.IsEnabled ? mBaseCaption + " [Plotter]" : mBaseCaption;
+		}
+
+		private void ApplyPlotterToLoadedFile(object sender, EventArgs e)
+		{
+			if (Core == null || Core.LoadedFile == null || Core.LoadedFile.Count == 0)
+				return;
+			Plotter.PlotterConfig cfg = Plotter.PlotterSettings.Load();
+			string offset = cfg.BladeOffsetMm.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+			string question = Plotter.PlotterSettingsForm.Tr(
+				"Rebuild the loaded toolpath for the drag knife? Blade offset " + offset + " mm. Do not run this twice on the same file.",
+				"Перестроить загруженную траекторию под нож? Смещение лезвия " + offset + " мм. Не запускайте это дважды для одного и того же файла.");
+			if (MessageBox.Show(this, question, Text, MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
+				return;
+			Core.LoadedFile.ApplyPlotterCompensation();
 		}
 
 		private void MnHotkeys_Click(object sender, EventArgs e)

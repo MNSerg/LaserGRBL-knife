@@ -56,6 +56,8 @@ namespace LaserGRBL.SvgConverter
                 if (f.DialogResult == DialogResult.OK)
                 {
                     Settings.SetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", f.IIBorderTracing.CurrentValue);
+					if (Plotter.PlotterSettings.IsEnabled)
+						Plotter.PlotterSettings.RememberCutSpeed(f.IIBorderTracing.CurrentValue);
                     Settings.SetObject("GrayScaleConversion.Gcode.LaserOptions.PowerMax", f.IIMaxPower.CurrentValue);
 					Settings.SetObject("GrayScaleConversion.Gcode.LaserOptions.PowerMin", f.IIMinPower.CurrentValue);
 					Settings.SetObject("GrayScaleConversion.Gcode.LaserOptions.LaserOn", (f.CBLaserON.SelectedItem as ComboboxItem).Value);
@@ -104,6 +106,14 @@ namespace LaserGRBL.SvgConverter
 		public void ShowDialogForm()
         {
 			IIBorderTracing.CurrentValue = Settings.GetObject("GrayScaleConversion.VectorizeOptions.BorderSpeed", 1000);
+			if (Plotter.PlotterSettings.IsEnabled)
+			{
+				IIBorderTracing.CurrentValue = Plotter.PlotterSettings.Load().CutSpeed;
+				IIMaxPower.Enabled = false;
+				IIMinPower.Enabled = false;
+				CBLaserON.Enabled = false;
+				Text = Plotter.PlotterSettingsForm.Tr("SVG to plotter", "SVG в программу плоттера");
+			}
 
 			string LaserOn = Settings.GetObject("GrayScaleConversion.Gcode.LaserOptions.LaserOn", "M3");
 

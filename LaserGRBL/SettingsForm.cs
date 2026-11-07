@@ -115,7 +115,30 @@ namespace LaserGRBL
 				LblWarnOrturAC.Visible = false;
 
 			InitAutoCoolingTab();
+			InitAutostart();
         }
+
+		private CheckBox mAutostart;
+
+		private void InitAutostart()
+		{
+			mAutostart = new CheckBox();
+			mAutostart.Name = "CbAutostart";
+			mAutostart.AutoSize = true;
+			mAutostart.Margin = new Padding(3, 8, 3, 3);
+			if (System.Threading.Thread.CurrentThread.CurrentUICulture.TwoLetterISOLanguageName == "ru")
+			{
+				mAutostart.Text = "Автозапуск";
+				TpOptions.Text = "Параметры";
+			}
+			else
+				mAutostart.Text = "Autostart";
+			mAutostart.Checked = Settings.GetObject(AutoStart.SettingKey, false);
+			while (Tlp.RowStyles.Count < 5)
+				Tlp.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			Tlp.RowStyles[4] = new RowStyle(SizeType.Absolute, 32);
+			Tlp.Controls.Add(mAutostart, 1, 4);
+		}
 
 		private void InitAutoCoolingTab()
 		{
@@ -255,6 +278,7 @@ namespace LaserGRBL
 			Settings.SetObject("DisableSafetyCountdown", CbDisableSafetyCD.Checked);
 			Settings.SetObject("QuietSafetyCountdown", CbQuietSafetyCB.Checked);
             Settings.SetObject("LegacyIcons", CbLegacyIcons.Checked);
+			AutoStart.Apply(mAutostart != null && mAutostart.Checked);
 			Settings.ConfiguredGraphicMode = (Settings.GraphicMode)CBGraphicMode.SelectedValue;
 
 			SettingsChanged?.Invoke(this, null);
